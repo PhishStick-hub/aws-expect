@@ -187,6 +187,7 @@ Guidelines:
 
 ### 4.2 Type hints
 
+- **All new code must include type annotations** — functions, methods, variables, and class attributes. No exceptions.
 - Use type hints for **all** function parameters and return types.
 - For AWS / boto3 use `Any`.
 - Prefer `dict[str, Any] | None` over `Optional[...]`.
