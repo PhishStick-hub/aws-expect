@@ -85,6 +85,27 @@ def dynamodb_table(dynamodb_resource: DynamoDBServiceResource) -> Iterator[Table
 
 
 @pytest.fixture()
+def dynamodb_tables(
+    dynamodb_resource: DynamoDBServiceResource,
+) -> Iterator[list[Table]]:
+    """Create three unique DynamoDB tables for parallel expectation tests."""
+    tables: list[Table] = []
+    for _ in range(3):
+        table_name = f"test-{uuid4().hex[:12]}"
+        table = dynamodb_resource.create_table(
+            TableName=table_name,
+            KeySchema=[{"AttributeName": "pk", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "pk", "AttributeType": "S"}],
+            BillingMode="PAY_PER_REQUEST",
+        )
+        table.meta.client.get_waiter("table_exists").wait(TableName=table_name)
+        tables.append(table)
+    yield tables
+    for table in tables:
+        table.delete()
+
+
+@pytest.fixture()
 def dynamodb_composite_table(
     dynamodb_resource: DynamoDBServiceResource,
 ) -> Iterator[Table]:

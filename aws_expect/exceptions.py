@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class WaitTimeoutError(Exception):
     """Base class for all wait timeout errors.
 
@@ -36,3 +39,32 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         else:
             msg = f"Timed out after {timeout}s waiting for item {key} in table {table_name}"
         super().__init__(msg)
+
+
+class AggregateWaitTimeoutError(WaitTimeoutError):
+    """Raised when one or more parallel expectations fail.
+
+    Contains individual errors and any successful results from the
+    parallel execution.
+
+    Attributes:
+        errors: List of :class:`WaitTimeoutError` exceptions that occurred.
+        results: Ordered list matching the input expectations. Each entry is
+            the successful return value or ``None`` if that expectation failed.
+        timeout: The maximum timeout among all individual errors.
+    """
+
+    def __init__(
+        self,
+        errors: list[WaitTimeoutError],
+        results: list[object],
+    ) -> None:
+        self.errors = errors
+        self.results = results
+        self.timeout = max(e.timeout for e in errors) if errors else 0.0
+        failed = len(errors)
+        total = len(results)
+        succeeded = total - failed
+        summary = f"{failed} of {total} expectations timed out ({succeeded} succeeded)"
+        details = "\n".join(f"  - {e}" for e in errors)
+        super().__init__(f"{summary}\n{details}")
