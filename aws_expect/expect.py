@@ -27,8 +27,8 @@ def expect_s3(s3_object: Any) -> S3ObjectExpectation:
     return S3ObjectExpectation(s3_object)
 
 
-def expect_dynamodb(table: Any) -> DynamoDBItemExpectation:
-    """Create an expectation for a DynamoDB Table resource.
+def expect_dynamodb_item(table: Any) -> DynamoDBItemExpectation:
+    """Create an expectation for a DynamoDB Table resource item.
 
     Args:
         table: A boto3 DynamoDB Table resource
@@ -41,11 +41,11 @@ def expect_dynamodb(table: Any) -> DynamoDBItemExpectation:
     Example::
 
         import boto3
-        from aws_expect import expect_dynamodb
+        from aws_expect import expect_dynamodb_item
 
         dynamodb = boto3.resource("dynamodb")
         table = dynamodb.Table("my-table")
-        item = expect_dynamodb(table).to_exist(key={"pk": "user-1"}, timeout=30)
+        item = expect_dynamodb_item(table).to_exist(key={"pk": "user-1"}, timeout=30)
     """
     return DynamoDBItemExpectation(table)
 

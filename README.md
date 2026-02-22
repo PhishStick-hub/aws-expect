@@ -46,13 +46,13 @@ expect_s3(obj).to_not_exist(timeout=10, poll_interval=2)
 
 ```python
 import boto3
-from aws_expect import expect_dynamodb, DynamoDBWaitTimeoutError
+from aws_expect import expect_dynamodb_item, DynamoDBWaitTimeoutError
 
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table("orders")
 
 try:
-    item = expect_dynamodb(table).to_exist(
+    item = expect_dynamodb_item(table).to_exist(
         key={"pk": "order-123"},
         timeout=30,
         poll_interval=5,
@@ -61,14 +61,14 @@ try:
 except DynamoDBWaitTimeoutError:
     print("Item did not appear within 30 seconds")
 
-item = expect_dynamodb(table).to_exist(
+item = expect_dynamodb_item(table).to_exist(
     key={"pk": "order-123"},
     entries={"status": "shipped"},
     timeout=60,
     poll_interval=5,
 )
 
-expect_dynamodb(table).to_not_exist(key={"pk": "order-123"}, timeout=10)
+expect_dynamodb_item(table).to_not_exist(key={"pk": "order-123"}, timeout=10)
 ```
 
 ### Catching Any Timeout
@@ -89,7 +89,7 @@ except WaitTimeoutError:
 | Function | Description | Returns |
 |----------|-------------|----------|
 | `expect_s3(s3_object)` | Creates `S3ObjectExpectation` wrapper | `S3ObjectExpectation` |
-| `expect_dynamodb(table)` | Creates `DynamoDBItemExpectation` wrapper | `DynamoDBItemExpectation` |
+| `expect_dynamodb_item(table)` | Creates `DynamoDBItemExpectation` wrapper | `DynamoDBItemExpectation` |
 
 | Method | Description | Raises |
 |--------|-------------|-------|

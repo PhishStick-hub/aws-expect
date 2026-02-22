@@ -16,7 +16,7 @@ This file defines how AI coding agents (OpenCode, Claude Code, etc.) should work
 
 The library focuses on:
 
-- Clear, declarative API: `expect_s3`, `expect_dynamodb` and expectation classes.
+- Clear, declarative API: `expect_s3`, `expect_dynamodb_item` and expectation classes.
 - Correct timeout behavior with good error messages.
 - Good developer experience: type hints, readable exceptions, and fast tests via LocalStack.
 
@@ -50,7 +50,7 @@ Current layout:
 aws_expect/
 ├── __init__.py        # Public API exports with __all__
 ├── exceptions.py      # Exception hierarchy (WaitTimeoutError & derived)
-├── expect.py          # Public API entry points (expect_s3, expect_dynamodb)
+├── expect.py          # Public API entry points (expect_s3, expect_dynamodb_item)
 ├── s3.py              # S3ObjectExpectation implementation
 └── dynamodb.py        # DynamoDBItemExpectation implementation
 tests/

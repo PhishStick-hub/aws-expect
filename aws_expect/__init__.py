@@ -6,7 +6,7 @@ from aws_expect.exceptions import (
     S3WaitTimeoutError,
     WaitTimeoutError,
 )
-from aws_expect.expect import expect_dynamodb, expect_dynamodb_table, expect_s3
+from aws_expect.expect import expect_dynamodb_item, expect_dynamodb_table, expect_s3
 from aws_expect.s3 import S3ObjectExpectation
 
 __all__ = [
@@ -16,7 +16,7 @@ __all__ = [
     "S3ObjectExpectation",
     "S3WaitTimeoutError",
     "WaitTimeoutError",
-    "expect_dynamodb",
+    "expect_dynamodb_item",
     "expect_dynamodb_table",
     "expect_s3",
 ]

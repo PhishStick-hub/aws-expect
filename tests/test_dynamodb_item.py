@@ -2,16 +2,16 @@ import threading
 
 import pytest
 
-from aws_expect import DynamoDBWaitTimeoutError, WaitTimeoutError, expect_dynamodb
+from aws_expect import DynamoDBWaitTimeoutError, WaitTimeoutError, expect_dynamodb_item
 
 
 class TestDynamoDBToExist:
-    """Tests for expect_dynamodb(table).to_exist(key=...)."""
+    """Tests for expect_dynamodb_item(table).to_exist(key=...)."""
 
     def test_returns_item_when_exists(self, dynamodb_table):
         dynamodb_table.put_item(Item={"pk": "user-1", "name": "Alice"})
 
-        result = expect_dynamodb(dynamodb_table).to_exist(
+        result = expect_dynamodb_item(dynamodb_table).to_exist(
             key={"pk": "user-1"}, timeout=10, poll_interval=1
         )
 
@@ -20,7 +20,7 @@ class TestDynamoDBToExist:
 
     def test_raises_timeout_when_item_missing(self, dynamodb_table):
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
-            expect_dynamodb(dynamodb_table).to_exist(
+            expect_dynamodb_item(dynamodb_table).to_exist(
                 key={"pk": "ghost"}, timeout=2, poll_interval=1
             )
 
@@ -31,7 +31,7 @@ class TestDynamoDBToExist:
     def test_catchable_as_base_wait_timeout_error(self, dynamodb_table):
         """DynamoDBWaitTimeoutError is a WaitTimeoutError."""
         with pytest.raises(WaitTimeoutError):
-            expect_dynamodb(dynamodb_table).to_exist(
+            expect_dynamodb_item(dynamodb_table).to_exist(
                 key={"pk": "ghost"}, timeout=2, poll_interval=1
             )
 
@@ -43,7 +43,7 @@ class TestDynamoDBToExist:
         timer.start()
 
         try:
-            result = expect_dynamodb(dynamodb_table).to_exist(
+            result = expect_dynamodb_item(dynamodb_table).to_exist(
                 key={"pk": "delayed"}, timeout=10, poll_interval=1
             )
             assert result["pk"] == "delayed"
@@ -56,7 +56,7 @@ class TestDynamoDBToExist:
             Item={"pk": "order-1", "status": "active", "total": 100}
         )
 
-        result = expect_dynamodb(dynamodb_table).to_exist(
+        result = expect_dynamodb_item(dynamodb_table).to_exist(
             key={"pk": "order-1"},
             entries={"status": "active"},
             timeout=10,
@@ -70,7 +70,7 @@ class TestDynamoDBToExist:
         dynamodb_table.put_item(Item={"pk": "order-2", "status": "pending"})
 
         with pytest.raises(DynamoDBWaitTimeoutError):
-            expect_dynamodb(dynamodb_table).to_exist(
+            expect_dynamodb_item(dynamodb_table).to_exist(
                 key={"pk": "order-2"},
                 entries={"status": "shipped"},
                 timeout=2,
@@ -92,7 +92,7 @@ class TestDynamoDBToExist:
         timer.start()
 
         try:
-            result = expect_dynamodb(dynamodb_table).to_exist(
+            result = expect_dynamodb_item(dynamodb_table).to_exist(
                 key={"pk": "order-3"},
                 entries={"status": "shipped"},
                 timeout=10,
@@ -107,7 +107,7 @@ class TestDynamoDBToExist:
             Item={"pk": "user-1", "sk": "order-1", "total": 50}
         )
 
-        result = expect_dynamodb(dynamodb_composite_table).to_exist(
+        result = expect_dynamodb_item(dynamodb_composite_table).to_exist(
             key={"pk": "user-1", "sk": "order-1"}, timeout=10, poll_interval=1
         )
 
@@ -118,7 +118,7 @@ class TestDynamoDBToExist:
             Item={"pk": "user-2", "sk": "order-5", "status": "done", "total": 200}
         )
 
-        result = expect_dynamodb(dynamodb_composite_table).to_exist(
+        result = expect_dynamodb_item(dynamodb_composite_table).to_exist(
             key={"pk": "user-2", "sk": "order-5"},
             entries={"status": "done", "total": 200},
             timeout=10,
@@ -130,10 +130,10 @@ class TestDynamoDBToExist:
 
 
 class TestDynamoDBToBeEmpty:
-    """Tests for expect_dynamodb(table).to_be_empty()."""
+    """Tests for expect_dynamodb_item(table).to_be_empty()."""
 
     def test_returns_none_when_table_empty(self, dynamodb_table):
-        result = expect_dynamodb(dynamodb_table).to_be_empty(
+        result = expect_dynamodb_item(dynamodb_table).to_be_empty(
             timeout=10, poll_interval=1
         )
 
@@ -143,7 +143,7 @@ class TestDynamoDBToBeEmpty:
         dynamodb_table.put_item(Item={"pk": "user-1", "name": "Alice"})
 
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
-            expect_dynamodb(dynamodb_table).to_be_empty(timeout=2, poll_interval=1)
+            expect_dynamodb_item(dynamodb_table).to_be_empty(timeout=2, poll_interval=1)
 
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key is None
@@ -154,7 +154,7 @@ class TestDynamoDBToBeEmpty:
         dynamodb_table.put_item(Item={"pk": "sticky"})
 
         with pytest.raises(WaitTimeoutError):
-            expect_dynamodb(dynamodb_table).to_be_empty(timeout=2, poll_interval=1)
+            expect_dynamodb_item(dynamodb_table).to_be_empty(timeout=2, poll_interval=1)
 
     def test_succeeds_when_items_deleted_mid_poll(self, dynamodb_table):
         dynamodb_table.put_item(Item={"pk": "temp-1"})
@@ -168,7 +168,7 @@ class TestDynamoDBToBeEmpty:
         timer.start()
 
         try:
-            result = expect_dynamodb(dynamodb_table).to_be_empty(
+            result = expect_dynamodb_item(dynamodb_table).to_be_empty(
                 timeout=10, poll_interval=1
             )
             assert result is None
@@ -177,12 +177,12 @@ class TestDynamoDBToBeEmpty:
 
 
 class TestDynamoDBToNotBeEmpty:
-    """Tests for expect_dynamodb(table).to_not_be_empty()."""
+    """Tests for expect_dynamodb_item(table).to_not_be_empty()."""
 
     def test_returns_none_when_table_has_items(self, dynamodb_table):
         dynamodb_table.put_item(Item={"pk": "user-1", "name": "Alice"})
 
-        result = expect_dynamodb(dynamodb_table).to_not_be_empty(
+        result = expect_dynamodb_item(dynamodb_table).to_not_be_empty(
             timeout=10, poll_interval=1
         )
 
@@ -190,7 +190,9 @@ class TestDynamoDBToNotBeEmpty:
 
     def test_raises_timeout_when_table_empty(self, dynamodb_table):
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
-            expect_dynamodb(dynamodb_table).to_not_be_empty(timeout=2, poll_interval=1)
+            expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+                timeout=2, poll_interval=1
+            )
 
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key is None
@@ -199,7 +201,9 @@ class TestDynamoDBToNotBeEmpty:
     def test_catchable_as_base_wait_timeout_error(self, dynamodb_table):
         """DynamoDBWaitTimeoutError from to_not_be_empty is a WaitTimeoutError."""
         with pytest.raises(WaitTimeoutError):
-            expect_dynamodb(dynamodb_table).to_not_be_empty(timeout=2, poll_interval=1)
+            expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+                timeout=2, poll_interval=1
+            )
 
     def test_succeeds_when_item_inserted_mid_poll(self, dynamodb_table):
         def insert_later():
@@ -209,7 +213,7 @@ class TestDynamoDBToNotBeEmpty:
         timer.start()
 
         try:
-            result = expect_dynamodb(dynamodb_table).to_not_be_empty(
+            result = expect_dynamodb_item(dynamodb_table).to_not_be_empty(
                 timeout=10, poll_interval=1
             )
             assert result is None
@@ -218,10 +222,10 @@ class TestDynamoDBToNotBeEmpty:
 
 
 class TestDynamoDBToNotExist:
-    """Tests for expect_dynamodb(table).to_not_exist(key=...)."""
+    """Tests for expect_dynamodb_item(table).to_not_exist(key=...)."""
 
     def test_returns_none_when_item_absent(self, dynamodb_table):
-        result = expect_dynamodb(dynamodb_table).to_not_exist(
+        result = expect_dynamodb_item(dynamodb_table).to_not_exist(
             key={"pk": "ghost"}, timeout=10, poll_interval=1
         )
 
@@ -231,7 +235,7 @@ class TestDynamoDBToNotExist:
         dynamodb_table.put_item(Item={"pk": "sticky", "val": "here"})
 
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
-            expect_dynamodb(dynamodb_table).to_not_exist(
+            expect_dynamodb_item(dynamodb_table).to_not_exist(
                 key={"pk": "sticky"}, timeout=2, poll_interval=1
             )
 
@@ -249,7 +253,7 @@ class TestDynamoDBToNotExist:
         timer.start()
 
         try:
-            result = expect_dynamodb(dynamodb_table).to_not_exist(
+            result = expect_dynamodb_item(dynamodb_table).to_not_exist(
                 key={"pk": "temp"}, timeout=10, poll_interval=1
             )
             assert result is None
