@@ -317,6 +317,7 @@ Additional checks:
 
 - Public APIs have docstrings.
 - `__all__` is updated.
+- If a public API was added or updated, `README.md` is updated accordingly.
 - No secrets or real AWS calls in tests.
 
 ---

@@ -1,6 +1,7 @@
 # AWS Expect
 
-Declarative, Pythonic waiters for AWS services using boto3 resources.
+Declarative, Pythonic waiters for AWS services using boto3.
+Wait for S3 objects and DynamoDB items or tables to reach an expected state — with optional content matching and parallel execution via `expect_all`.
 
 ## Features
 

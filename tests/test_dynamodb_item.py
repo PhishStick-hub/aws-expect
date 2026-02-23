@@ -1,8 +1,15 @@
 import threading
+from decimal import Decimal
+from typing import Any
 
 import pytest
 
-from aws_expect import DynamoDBWaitTimeoutError, WaitTimeoutError, expect_dynamodb_item
+from aws_expect import (
+    DynamoDBNonNumericFieldError,
+    DynamoDBWaitTimeoutError,
+    WaitTimeoutError,
+    expect_dynamodb_item,
+)
 
 
 class TestDynamoDBToExist:
@@ -176,13 +183,13 @@ class TestDynamoDBToBeEmpty:
             timer.cancel()
 
 
-class TestDynamoDBToNotBeEmpty:
-    """Tests for expect_dynamodb_item(table).to_not_be_empty()."""
+class TestDynamoDBToBeNotEmpty:
+    """Tests for expect_dynamodb_item(table).to_be_not_empty()."""
 
     def test_returns_none_when_table_has_items(self, dynamodb_table):
         dynamodb_table.put_item(Item={"pk": "user-1", "name": "Alice"})
 
-        result = expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+        result = expect_dynamodb_item(dynamodb_table).to_be_not_empty(
             timeout=10, poll_interval=1
         )
 
@@ -190,7 +197,7 @@ class TestDynamoDBToNotBeEmpty:
 
     def test_raises_timeout_when_table_empty(self, dynamodb_table):
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
-            expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+            expect_dynamodb_item(dynamodb_table).to_be_not_empty(
                 timeout=2, poll_interval=1
             )
 
@@ -199,9 +206,9 @@ class TestDynamoDBToNotBeEmpty:
         assert exc_info.value.timeout == 2
 
     def test_catchable_as_base_wait_timeout_error(self, dynamodb_table):
-        """DynamoDBWaitTimeoutError from to_not_be_empty is a WaitTimeoutError."""
+        """DynamoDBWaitTimeoutError from to_be_not_empty is a WaitTimeoutError."""
         with pytest.raises(WaitTimeoutError):
-            expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+            expect_dynamodb_item(dynamodb_table).to_be_not_empty(
                 timeout=2, poll_interval=1
             )
 
@@ -213,12 +220,172 @@ class TestDynamoDBToNotBeEmpty:
         timer.start()
 
         try:
-            result = expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+            result = expect_dynamodb_item(dynamodb_table).to_be_not_empty(
                 timeout=10, poll_interval=1
             )
             assert result is None
         finally:
             timer.cancel()
+
+
+class TestDynamoDBToHaveNumericValueCloseTo:
+    """Tests for expect_dynamodb_item(table).to_have_numeric_value_close_to(...)."""
+
+    def test_returns_item_when_value_matches_exactly(self, dynamodb_table: Any) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-1", "score": 42})
+
+        result = expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
+            key={"pk": "item-1"},
+            field="score",
+            expected=42,
+            delta=0,
+            timeout=10,
+            poll_interval=1,
+        )
+
+        assert result["pk"] == "item-1"
+        assert result["score"] == 42
+
+    def test_returns_item_when_value_within_delta(self, dynamodb_table: Any) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-2", "temperature": Decimal("98.9")})
+
+        result = expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
+            key={"pk": "item-2"},
+            field="temperature",
+            expected=100,
+            delta=2,
+            timeout=10,
+            poll_interval=1,
+        )
+
+        assert result["pk"] == "item-2"
+
+    def test_raises_timeout_when_value_out_of_delta(self, dynamodb_table: Any) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-3", "score": 50})
+
+        with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
+            expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
+                key={"pk": "item-3"},
+                field="score",
+                expected=100,
+                delta=1,
+                timeout=2,
+                poll_interval=1,
+            )
+
+        assert exc_info.value.table_name == dynamodb_table.name
+        assert exc_info.value.key == {"pk": "item-3"}
+        assert exc_info.value.timeout == 2
+
+    def test_raises_immediately_when_field_not_numeric(
+        self, dynamodb_table: Any
+    ) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-4", "score": "not-a-number"})
+
+        with pytest.raises(DynamoDBNonNumericFieldError) as exc_info:
+            expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
+                key={"pk": "item-4"},
+                field="score",
+                expected=100,
+                delta=5,
+                timeout=10,
+                poll_interval=1,
+            )
+
+        assert exc_info.value.table_name == dynamodb_table.name
+        assert exc_info.value.key == {"pk": "item-4"}
+        assert exc_info.value.field == "score"
+        assert exc_info.value.value == "not-a-number"
+
+    def test_raises_timeout_when_item_missing(self, dynamodb_table: Any) -> None:
+        with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
+            expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
+                key={"pk": "ghost"},
+                field="score",
+                expected=10,
+                delta=1,
+                timeout=2,
+                poll_interval=1,
+            )
+
+        assert exc_info.value.table_name == dynamodb_table.name
+        assert exc_info.value.key == {"pk": "ghost"}
+        assert exc_info.value.timeout == 2
+
+    def test_raises_timeout_when_field_absent(self, dynamodb_table: Any) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-5", "other": "value"})
+
+        with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
+            expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
+                key={"pk": "item-5"},
+                field="score",
+                expected=10,
+                delta=1,
+                timeout=2,
+                poll_interval=1,
+            )
+
+        assert exc_info.value.table_name == dynamodb_table.name
+
+    def test_catchable_as_base_wait_timeout_error(self, dynamodb_table: Any) -> None:
+        """DynamoDBWaitTimeoutError is a WaitTimeoutError."""
+        with pytest.raises(WaitTimeoutError):
+            expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
+                key={"pk": "ghost"},
+                field="score",
+                expected=10,
+                delta=1,
+                timeout=2,
+                poll_interval=1,
+            )
+
+    def test_succeeds_when_value_converges_mid_poll(self, dynamodb_table: Any) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-6", "score": 1})
+
+        def update_later() -> None:
+            dynamodb_table.update_item(
+                Key={"pk": "item-6"},
+                UpdateExpression="SET score = :val",
+                ExpressionAttributeValues={":val": 100},
+            )
+
+        timer = threading.Timer(2.0, update_later)
+        timer.start()
+
+        try:
+            result = expect_dynamodb_item(
+                dynamodb_table
+            ).to_have_numeric_value_close_to(
+                key={"pk": "item-6"},
+                field="score",
+                expected=100,
+                delta=5,
+                timeout=10,
+                poll_interval=1,
+            )
+            assert result["pk"] == "item-6"
+            assert abs(result["score"] - 100) <= 5
+        finally:
+            timer.cancel()
+
+    def test_works_with_composite_key(self, dynamodb_composite_table: Any) -> None:
+        dynamodb_composite_table.put_item(
+            Item={"pk": "user-1", "sk": "order-1", "amount": Decimal("99.5")}
+        )
+
+        result = expect_dynamodb_item(
+            dynamodb_composite_table
+        ).to_have_numeric_value_close_to(
+            key={"pk": "user-1", "sk": "order-1"},
+            field="amount",
+            expected=100,
+            delta=1,
+            timeout=10,
+            poll_interval=1,
+        )
+
+        assert result["pk"] == "user-1"
+        assert result["sk"] == "order-1"
 
 
 class TestDynamoDBToNotExist:
