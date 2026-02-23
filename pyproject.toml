@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aws-expect"
-version = "0.1.2"
+version = "0.2.0.dev1"
 description = "Declarative expect/wait syntax for AWS services (S3, DynamoDB, and more)"
 readme = "README.md"
 authors = [
