@@ -20,6 +20,16 @@ jobs:
       url: https://test.pypi.org/project/aws-expect/
     
     steps:
+      - name: Validate tag input
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-.+$ ]]; then
+            echo "ERROR: '$TAG' is not a valid pre-release tag (expected format: v0.1.0-rc1)"
+            exit 1
+          fi
+          echo "Tag '$TAG' is valid."
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
