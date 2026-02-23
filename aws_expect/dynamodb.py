@@ -1,8 +1,9 @@
 import math
 import time
+from decimal import Decimal
 from typing import Any
 
-from aws_expect.exceptions import DynamoDBWaitTimeoutError
+from aws_expect.exceptions import DynamoDBNonNumericFieldError, DynamoDBWaitTimeoutError
 
 
 class DynamoDBItemExpectation:
@@ -54,6 +55,66 @@ class DynamoDBItemExpectation:
             if remaining <= 0:
                 raise DynamoDBWaitTimeoutError(
                     self._table_name, key, timeout, entries=entries
+                )
+            time.sleep(min(delay, remaining))
+
+    def to_have_numeric_value_close_to(
+        self,
+        key: dict[str, Any],
+        field: str,
+        expected: float,
+        delta: float,
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> dict[str, Any]:
+        """Poll ``get_item`` until the item exists and a numeric field is within *delta* of *expected*.
+
+        The condition is satisfied when ``abs(item[field] - expected) <= delta``.
+
+        If the field exists but its value is not a number (``int``, ``float``,
+        or ``Decimal`` as returned by the boto3 DynamoDB resource layer),
+        a :class:`DynamoDBWaitTimeoutError` is raised immediately rather than
+        waiting for the timeout.  A missing item or absent field is treated as
+        the condition not yet being met, and polling continues.
+
+        Args:
+            key: Primary key dict, e.g. ``{"pk": "val"}`` or
+                ``{"pk": "val", "sk": "val"}``.
+            field: Name of the numeric attribute to check.
+            expected: The target numeric value.
+            delta: Maximum allowed absolute difference from *expected*.
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+
+        Returns:
+            The full item dict from DynamoDB.
+
+        Raises:
+            DynamoDBWaitTimeoutError: Immediately if *field* contains a
+                non-numeric value; after *timeout* if the item does not exist,
+                *field* is absent, or the value does not converge within *delta*.
+        """
+        delay = self._compute_delay(poll_interval)
+        deadline = time.monotonic() + timeout
+        timeout_message = (
+            f"Timed out after {timeout}s waiting for item {key} field '{field}'"
+            f" to be within {delta} of {expected} in table {self._table_name}"
+        )
+
+        while True:
+            response: dict[str, Any] = self._table.get_item(Key=key)
+            if (item := response.get("Item")) is not None:
+                if (value := item.get(field)) is not None:
+                    if not isinstance(value, (int, float, Decimal)):
+                        raise DynamoDBNonNumericFieldError(
+                            self._table_name, key, field, value, timeout
+                        )
+                    if self._is_close(value, expected, delta):
+                        return item
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise DynamoDBWaitTimeoutError(
+                    self._table_name, key, timeout, message=timeout_message
                 )
             time.sleep(min(delay, remaining))
 
@@ -186,6 +247,11 @@ class DynamoDBItemExpectation:
     def _matches_entries(item: dict[str, Any], entries: dict[str, Any]) -> bool:
         """Check that *item* contains all expected *entries* (subset match)."""
         return all(item.get(k) == v for k, v in entries.items())
+
+    @staticmethod
+    def _is_close(value: int | float | Decimal, expected: float, delta: float) -> bool:
+        """Return True when ``abs(value - expected) <= delta``."""
+        return abs(float(value) - expected) <= delta
 
 
 class DynamoDBTableExpectation:

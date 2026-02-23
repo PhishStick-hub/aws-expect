@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+NON_NUMERIC_FIELD_MSG = (
+    "Field '{field}' has non-numeric value {value!r}"
+    " (type {type}) for item {key} in table {table_name}"
+)
+
 
 class WaitTimeoutError(Exception):
     """Base class for all wait timeout errors.
@@ -45,6 +50,45 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         else:
             msg = f"Timed out after {timeout}s waiting for item {key} in table {table_name}"
         super().__init__(msg)
+
+
+class DynamoDBNonNumericFieldError(WaitTimeoutError):
+    """Raised immediately when a DynamoDB item field contains a non-numeric value.
+
+    Unlike :class:`DynamoDBWaitTimeoutError`, this is not a polling timeout —
+    it signals that the field value is of the wrong type and polling cannot
+    succeed regardless of how long the wait continues.
+
+    Attributes:
+        table_name: Name of the DynamoDB table.
+        key: Primary key dict used to look up the item.
+        field: Name of the attribute that held the non-numeric value.
+        value: The actual value found in the field.
+        timeout: The timeout that was configured for the wait operation.
+    """
+
+    def __init__(
+        self,
+        table_name: str,
+        key: dict[str, Any],
+        field: str,
+        value: Any,
+        timeout: float,
+    ) -> None:
+        self.table_name = table_name
+        self.key = key
+        self.field = field
+        self.value = value
+        self.timeout = timeout
+        super().__init__(
+            NON_NUMERIC_FIELD_MSG.format(
+                field=field,
+                value=value,
+                type=type(value).__name__,
+                key=key,
+                table_name=table_name,
+            )
+        )
 
 
 class AggregateWaitTimeoutError(WaitTimeoutError):

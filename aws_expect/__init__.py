@@ -3,6 +3,7 @@ __version__ = "0.1.2"
 from aws_expect.dynamodb import DynamoDBItemExpectation, DynamoDBTableExpectation
 from aws_expect.exceptions import (
     AggregateWaitTimeoutError,
+    DynamoDBNonNumericFieldError,
     DynamoDBWaitTimeoutError,
     S3WaitTimeoutError,
     WaitTimeoutError,
@@ -14,6 +15,7 @@ from aws_expect.s3 import S3ObjectExpectation
 __all__ = [
     "AggregateWaitTimeoutError",
     "DynamoDBItemExpectation",
+    "DynamoDBNonNumericFieldError",
     "DynamoDBTableExpectation",
     "DynamoDBWaitTimeoutError",
     "S3ObjectExpectation",
