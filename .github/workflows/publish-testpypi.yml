@@ -2,9 +2,14 @@ name: Publish to TestPyPI
 
 on:
   push:
-    branches:
-      - develop
+    tags:
+      - "v*-*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to publish (e.g., v0.1.0-rc1)'
+        required: true
+        type: string
 
 jobs:
   publish-testpypi:
@@ -17,6 +22,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
