@@ -176,13 +176,13 @@ class TestDynamoDBToBeEmpty:
             timer.cancel()
 
 
-class TestDynamoDBToNotBeEmpty:
-    """Tests for expect_dynamodb_item(table).to_not_be_empty()."""
+class TestDynamoDBToBeNotEmpty:
+    """Tests for expect_dynamodb_item(table).to_be_not_empty()."""
 
     def test_returns_none_when_table_has_items(self, dynamodb_table):
         dynamodb_table.put_item(Item={"pk": "user-1", "name": "Alice"})
 
-        result = expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+        result = expect_dynamodb_item(dynamodb_table).to_be_not_empty(
             timeout=10, poll_interval=1
         )
 
@@ -190,7 +190,7 @@ class TestDynamoDBToNotBeEmpty:
 
     def test_raises_timeout_when_table_empty(self, dynamodb_table):
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
-            expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+            expect_dynamodb_item(dynamodb_table).to_be_not_empty(
                 timeout=2, poll_interval=1
             )
 
@@ -199,9 +199,9 @@ class TestDynamoDBToNotBeEmpty:
         assert exc_info.value.timeout == 2
 
     def test_catchable_as_base_wait_timeout_error(self, dynamodb_table):
-        """DynamoDBWaitTimeoutError from to_not_be_empty is a WaitTimeoutError."""
+        """DynamoDBWaitTimeoutError from to_be_not_empty is a WaitTimeoutError."""
         with pytest.raises(WaitTimeoutError):
-            expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+            expect_dynamodb_item(dynamodb_table).to_be_not_empty(
                 timeout=2, poll_interval=1
             )
 
@@ -213,7 +213,7 @@ class TestDynamoDBToNotBeEmpty:
         timer.start()
 
         try:
-            result = expect_dynamodb_item(dynamodb_table).to_not_be_empty(
+            result = expect_dynamodb_item(dynamodb_table).to_be_not_empty(
                 timeout=10, poll_interval=1
             )
             assert result is None

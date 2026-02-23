@@ -99,7 +99,7 @@ class DynamoDBItemExpectation:
                 )
             time.sleep(min(delay, remaining))
 
-    def to_not_be_empty(
+    def to_be_not_empty(
         self,
         timeout: float = 30,
         poll_interval: float = 5,
