@@ -52,7 +52,9 @@ class DynamoDBItemExpectation:
                     return item
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise DynamoDBWaitTimeoutError(self._table_name, key, timeout)
+                raise DynamoDBWaitTimeoutError(
+                    self._table_name, key, timeout, entries=entries
+                )
             time.sleep(min(delay, remaining))
 
     def to_be_empty(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 
 class WaitTimeoutError(Exception):
     """Base class for all wait timeout errors.
@@ -30,12 +32,16 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         key: dict[str, str] | None,
         timeout: float,
         message: str | None = None,
+        entries: dict[str, Any] | None = None,
     ) -> None:
         self.table_name = table_name
         self.key = key
         self.timeout = timeout
+        self.entries = entries
         if message is not None:
             msg = message
+        elif entries is not None:
+            msg = f"Timed out after {timeout}s waiting for item {key} with entries {entries} in table {table_name}"
         else:
             msg = f"Timed out after {timeout}s waiting for item {key} in table {table_name}"
         super().__init__(msg)
