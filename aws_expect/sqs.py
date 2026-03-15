@@ -33,6 +33,11 @@ class SQSQueueExpectation:
             The matching SQS message dict (includes ``Body``, ``MessageId``,
             ``ReceiptHandle``, and optional attribute keys).
 
+        Note:
+            At most 10 messages are inspected per poll (SQS API limit).
+            On queues with many messages the target may require multiple
+            polls to be returned by ``receive_message``.
+
         Raises:
             SQSWaitTimeoutError: If no matching message appears within *timeout*.
         """
@@ -74,6 +79,11 @@ class SQSQueueExpectation:
         Returns:
             The consumed SQS message dict (includes ``Body``, ``MessageId``,
             ``ReceiptHandle``, and optional attribute keys).
+
+        Note:
+            At most 10 messages are inspected per poll (SQS API limit).
+            On queues with many messages the target may require multiple
+            polls to be returned by ``receive_message``.
 
         Raises:
             SQSWaitTimeoutError: If no matching message appears within *timeout*.
