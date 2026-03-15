@@ -4,7 +4,6 @@ from uuid import uuid4
 import boto3
 import pytest
 from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource, Table
-from mypy_boto3_s3.client import S3Client
 from mypy_boto3_s3.service_resource import S3ServiceResource
 from mypy_boto3_sqs.service_resource import Queue, SQSServiceResource
 from testcontainers.localstack import LocalStackContainer
@@ -15,18 +14,6 @@ def localstack() -> Iterator[LocalStackContainer]:
     """Start a LocalStack container for the entire test session."""
     with LocalStackContainer(image="localstack/localstack:4") as container:
         yield container
-
-
-@pytest.fixture(scope="session")
-def s3_client(localstack: LocalStackContainer) -> S3Client:
-    """Create a boto3 S3 client connected to the LocalStack container."""
-    return boto3.client(
-        "s3",
-        endpoint_url=localstack.get_url(),
-        region_name="us-east-1",
-        aws_access_key_id="test",
-        aws_secret_access_key="test",
-    )
 
 
 @pytest.fixture(scope="session")
@@ -42,17 +29,15 @@ def s3_resource(localstack: LocalStackContainer) -> S3ServiceResource:
 
 
 @pytest.fixture()
-def test_bucket(s3_client: S3Client) -> Iterator[str]:
+def test_bucket(s3_resource: S3ServiceResource) -> Iterator[str]:
     """Create a unique S3 bucket for each test, cleaned up afterwards."""
     bucket_name = f"test-{uuid4().hex[:12]}"
-    s3_client.create_bucket(Bucket=bucket_name)
+    bucket = s3_resource.create_bucket(Bucket=bucket_name)
     yield bucket_name
 
-    # Cleanup: delete all objects then the bucket
-    response = s3_client.list_objects_v2(Bucket=bucket_name)
-    for obj in response.get("Contents", []):
-        s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
-    s3_client.delete_bucket(Bucket=bucket_name)
+    for obj in bucket.objects.all():
+        obj.delete()
+    bucket.delete()
 
 
 # ── DynamoDB fixtures ──────────────────────────────────────────────
