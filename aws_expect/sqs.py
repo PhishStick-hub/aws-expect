@@ -1,6 +1,6 @@
 import math
 import time
-from typing import Any
+from typing import Any, Generator
 
 from aws_expect.exceptions import SQSWaitTimeoutError
 
@@ -12,6 +12,47 @@ class SQSQueueExpectation:
         self._queue = queue
         self._queue_url: str = queue.url
         self._client = queue.meta.client
+
+    def _receive_batches(
+        self,
+        body: str,
+        timeout: float,
+        poll_interval: float,
+        visibility_timeout: int,
+    ) -> Generator[list[dict[str, Any]], None, None]:
+        """Yield batches of messages from the queue until timeout.
+
+        Handles the polling loop: delay computation, deadline tracking,
+        receive_message call, sleep, and SQSWaitTimeoutError on expiry.
+
+        Args:
+            body: Expected message body — used only in the timeout error.
+            timeout: Maximum seconds to poll.
+            poll_interval: Seconds between polls (minimum 1).
+            visibility_timeout: VisibilityTimeout passed to receive_message.
+
+        Yields:
+            List of message dicts from each receive_message call (may be empty).
+
+        Raises:
+            SQSWaitTimeoutError: When the deadline passes without the caller
+                returning from the for loop.
+        """
+        delay = self._compute_delay(poll_interval)
+        deadline = time.monotonic() + timeout
+
+        while True:
+            response = self._client.receive_message(
+                QueueUrl=self._queue_url,
+                MaxNumberOfMessages=10,
+                VisibilityTimeout=visibility_timeout,
+                WaitTimeSeconds=0,
+            )
+            yield response.get("Messages", [])
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise SQSWaitTimeoutError(self._queue_url, body, timeout)
+            time.sleep(min(delay, remaining))
 
     def to_have_message(
         self,
@@ -41,23 +82,13 @@ class SQSQueueExpectation:
         Raises:
             SQSWaitTimeoutError: If no matching message appears within *timeout*.
         """
-        delay = self._compute_delay(poll_interval)
-        deadline = time.monotonic() + timeout
-
-        while True:
-            response = self._client.receive_message(
-                QueueUrl=self._queue_url,
-                MaxNumberOfMessages=10,
-                VisibilityTimeout=0,
-                WaitTimeSeconds=0,
-            )
-            for message in response.get("Messages", []):
+        for messages in self._receive_batches(
+            body, timeout, poll_interval, visibility_timeout=0
+        ):
+            for message in messages:
                 if message["Body"] == body:
                     return message
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise SQSWaitTimeoutError(self._queue_url, body, timeout)
-            time.sleep(min(delay, remaining))
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def to_consume_message(
         self,
@@ -88,17 +119,9 @@ class SQSQueueExpectation:
         Raises:
             SQSWaitTimeoutError: If no matching message appears within *timeout*.
         """
-        delay = self._compute_delay(poll_interval)
-        deadline = time.monotonic() + timeout
-
-        while True:
-            response = self._client.receive_message(
-                QueueUrl=self._queue_url,
-                MaxNumberOfMessages=10,
-                VisibilityTimeout=10,
-                WaitTimeSeconds=0,
-            )
-            messages = response.get("Messages", [])
+        for messages in self._receive_batches(
+            body, timeout, poll_interval, visibility_timeout=10
+        ):
             matched: dict[str, Any] | None = None
             for message in messages:
                 if message["Body"] == body:
@@ -126,11 +149,7 @@ class SQSQueueExpectation:
                     ReceiptHandle=message["ReceiptHandle"],
                     VisibilityTimeout=0,
                 )
-
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise SQSWaitTimeoutError(self._queue_url, body, timeout)
-            time.sleep(min(delay, remaining))
+        raise AssertionError("unreachable")  # pragma: no cover
 
     @staticmethod
     def _compute_delay(poll_interval: float) -> int:
