@@ -9,11 +9,9 @@ from aws_expect import S3WaitTimeoutError, expect_s3
 class TestToExist:
     """Tests for expect_s3(s3_object).to_exist()."""
 
-    def test_returns_metadata_when_object_exists(
-        self, s3_client, s3_resource, test_bucket
-    ):
+    def test_returns_metadata_when_object_exists(self, s3_resource, test_bucket):
         key = "hello.txt"
-        s3_client.put_object(Bucket=test_bucket, Key=key, Body=b"hello world")
+        s3_resource.Object(test_bucket, key).put(Body=b"hello world")
 
         obj = s3_resource.Object(test_bucket, key)
         result = expect_s3(obj).to_exist(timeout=10, poll_interval=1)
@@ -34,13 +32,11 @@ class TestToExist:
         assert exc_info.value.key == key
         assert exc_info.value.timeout == 2
 
-    def test_succeeds_when_object_appears_mid_poll(
-        self, s3_client, s3_resource, test_bucket
-    ):
+    def test_succeeds_when_object_appears_mid_poll(self, s3_resource, test_bucket):
         key = "delayed.txt"
 
         def upload_later():
-            s3_client.put_object(Bucket=test_bucket, Key=key, Body=b"arrived")
+            s3_resource.Object(test_bucket, key).put(Body=b"arrived")
 
         timer = threading.Timer(2.0, upload_later)
         timer.start()
@@ -52,15 +48,10 @@ class TestToExist:
         finally:
             timer.cancel()
 
-    def test_returns_correct_metadata_for_content_type(
-        self, s3_client, s3_resource, test_bucket
-    ):
+    def test_returns_correct_metadata_for_content_type(self, s3_resource, test_bucket):
         key = "data.json"
-        s3_client.put_object(
-            Bucket=test_bucket,
-            Key=key,
-            Body=b'{"a": 1}',
-            ContentType="application/json",
+        s3_resource.Object(test_bucket, key).put(
+            Body=b'{"a": 1}', ContentType="application/json"
         )
 
         obj = s3_resource.Object(test_bucket, key)
@@ -68,12 +59,10 @@ class TestToExist:
 
         assert result["ContentType"] == "application/json"
 
-    def test_matches_expected_entries(self, s3_client, s3_resource, test_bucket):
+    def test_matches_expected_entries(self, s3_resource, test_bucket):
         key = "order.json"
-        s3_client.put_object(
-            Bucket=test_bucket,
-            Key=key,
-            Body=json.dumps({"status": "active", "total": 100}).encode(),
+        s3_resource.Object(test_bucket, key).put(
+            Body=json.dumps({"status": "active", "total": 100}).encode()
         )
 
         obj = s3_resource.Object(test_bucket, key)
@@ -86,14 +75,10 @@ class TestToExist:
         assert result["status"] == "active"
         assert result["total"] == 100  # extra fields are present
 
-    def test_raises_timeout_when_entries_dont_match(
-        self, s3_client, s3_resource, test_bucket
-    ):
+    def test_raises_timeout_when_entries_dont_match(self, s3_resource, test_bucket):
         key = "order.json"
-        s3_client.put_object(
-            Bucket=test_bucket,
-            Key=key,
-            Body=json.dumps({"status": "pending"}).encode(),
+        s3_resource.Object(test_bucket, key).put(
+            Body=json.dumps({"status": "pending"}).encode()
         )
 
         obj = s3_resource.Object(test_bucket, key)
@@ -104,21 +89,15 @@ class TestToExist:
                 poll_interval=1,
             )
 
-    def test_succeeds_when_entries_match_after_update(
-        self, s3_client, s3_resource, test_bucket
-    ):
+    def test_succeeds_when_entries_match_after_update(self, s3_resource, test_bucket):
         key = "order.json"
-        s3_client.put_object(
-            Bucket=test_bucket,
-            Key=key,
-            Body=json.dumps({"status": "pending"}).encode(),
+        s3_resource.Object(test_bucket, key).put(
+            Body=json.dumps({"status": "pending"}).encode()
         )
 
         def update_later():
-            s3_client.put_object(
-                Bucket=test_bucket,
-                Key=key,
-                Body=json.dumps({"status": "shipped"}).encode(),
+            s3_resource.Object(test_bucket, key).put(
+                Body=json.dumps({"status": "shipped"}).encode()
             )
 
         timer = threading.Timer(2.0, update_later)

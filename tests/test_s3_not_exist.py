@@ -16,11 +16,9 @@ class TestToNotExist:
 
         assert result is None
 
-    def test_raises_timeout_when_object_still_exists(
-        self, s3_client, s3_resource, test_bucket
-    ):
+    def test_raises_timeout_when_object_still_exists(self, s3_resource, test_bucket):
         key = "persistent.txt"
-        s3_client.put_object(Bucket=test_bucket, Key=key, Body=b"still here")
+        s3_resource.Object(test_bucket, key).put(Body=b"still here")
 
         obj = s3_resource.Object(test_bucket, key)
         with pytest.raises(S3WaitTimeoutError) as exc_info:
@@ -30,14 +28,12 @@ class TestToNotExist:
         assert exc_info.value.key == key
         assert exc_info.value.timeout == 2
 
-    def test_succeeds_when_object_deleted_mid_poll(
-        self, s3_client, s3_resource, test_bucket
-    ):
+    def test_succeeds_when_object_deleted_mid_poll(self, s3_resource, test_bucket):
         key = "temporary.txt"
-        s3_client.put_object(Bucket=test_bucket, Key=key, Body=b"going away")
+        s3_resource.Object(test_bucket, key).put(Body=b"going away")
 
         def delete_later():
-            s3_client.delete_object(Bucket=test_bucket, Key=key)
+            s3_resource.Object(test_bucket, key).delete()
 
         timer = threading.Timer(2.0, delete_later)
         timer.start()
