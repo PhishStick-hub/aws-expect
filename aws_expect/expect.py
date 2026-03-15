@@ -2,6 +2,7 @@ from typing import Any
 
 from aws_expect.dynamodb import DynamoDBItemExpectation, DynamoDBTableExpectation
 from aws_expect.s3 import S3ObjectExpectation
+from aws_expect.sqs import SQSQueueExpectation
 
 
 def expect_s3(s3_object: Any) -> S3ObjectExpectation:
@@ -76,3 +77,26 @@ def expect_dynamodb_table(
         description = expect_dynamodb_table(dynamodb, "my-table").to_exist(timeout=60)
     """
     return DynamoDBTableExpectation(dynamodb_resource, table_name)
+
+
+def expect_sqs(queue: Any) -> SQSQueueExpectation:
+    """Create an expectation for a boto3 SQS Queue resource.
+
+    Args:
+        queue: A boto3 SQS Queue resource
+            (``boto3.resource("sqs").Queue(url)``).
+
+    Returns:
+        An :class:`SQSQueueExpectation` that can be used to wait for
+        a message to be present or to consume a message.
+
+    Example::
+
+        import boto3
+        from aws_expect import expect_sqs
+
+        sqs = boto3.resource("sqs")
+        queue = sqs.Queue("https://sqs.us-east-1.amazonaws.com/123/my-queue")
+        message = expect_sqs(queue).to_have_message(body="hello", timeout=30)
+    """
+    return SQSQueueExpectation(queue)

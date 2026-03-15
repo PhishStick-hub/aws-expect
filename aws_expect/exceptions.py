@@ -91,6 +91,19 @@ class DynamoDBNonNumericFieldError(WaitTimeoutError):
         )
 
 
+class SQSWaitTimeoutError(WaitTimeoutError):
+    """Raised when an SQS wait operation exceeds the specified timeout."""
+
+    def __init__(self, queue_url: str, body: str, timeout: float) -> None:
+        self.queue_url = queue_url
+        self.body = body
+        self.timeout = timeout
+        super().__init__(
+            f"Timed out after {timeout}s waiting for message with body={body!r}"
+            f" in queue {queue_url}"
+        )
+
+
 class AggregateWaitTimeoutError(WaitTimeoutError):
     """Raised when one or more parallel expectations fail.
 
