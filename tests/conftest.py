@@ -6,6 +6,7 @@ import pytest
 from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource, Table
 from mypy_boto3_s3.client import S3Client
 from mypy_boto3_s3.service_resource import S3ServiceResource
+from mypy_boto3_sqs.service_resource import Queue, SQSServiceResource
 from testcontainers.localstack import LocalStackContainer
 
 
@@ -126,3 +127,27 @@ def dynamodb_composite_table(
     table.meta.client.get_waiter("table_exists").wait(TableName=table_name)
     yield table
     table.delete()
+
+
+# ── SQS fixtures ──────────────────────────────────────────────────
+
+
+@pytest.fixture(scope="session")
+def sqs_resource(localstack: LocalStackContainer) -> SQSServiceResource:
+    """Create a boto3 SQS resource connected to the LocalStack container."""
+    return boto3.resource(
+        "sqs",
+        endpoint_url=localstack.get_url(),
+        region_name="us-east-1",
+        aws_access_key_id="test",
+        aws_secret_access_key="test",
+    )
+
+
+@pytest.fixture()
+def sqs_queue(sqs_resource: SQSServiceResource) -> Iterator[Queue]:
+    """Create a unique standard SQS queue for each test, cleaned up afterwards."""
+    queue_name = f"test-{uuid4().hex[:12]}"
+    queue = sqs_resource.create_queue(QueueName=queue_name)
+    yield queue
+    queue.delete()
