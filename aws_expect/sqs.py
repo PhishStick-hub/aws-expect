@@ -2,7 +2,7 @@ import math
 import time
 from typing import Any, Generator
 
-from aws_expect.exceptions import SQSWaitTimeoutError
+from aws_expect.exceptions import SQSUnexpectedMessageError, SQSWaitTimeoutError
 
 
 class SQSQueueExpectation:
@@ -150,6 +150,43 @@ class SQSQueueExpectation:
                     VisibilityTimeout=0,
                 )
         raise AssertionError("unreachable")  # pragma: no cover
+
+    def to_not_have_message(
+        self,
+        body: str,
+        delay: float,
+    ) -> None:
+        """Assert that a message with the given body is absent after a fixed delay.
+
+        Sleeps for *delay* seconds (clamped to a minimum of 1 via
+        :meth:`_compute_delay`), then performs a single non-destructive
+        receive_message check.
+
+        Args:
+            body: Exact string the message body must NOT equal.
+            delay: Seconds to sleep before performing the check.
+
+        Returns:
+            ``None`` when no message with *body* is found.
+
+        Note:
+            At most 10 messages are inspected (SQS API limit). On queues
+            with many messages the target may not be returned by a single
+            ``receive_message`` call even if it is present.
+
+        Raises:
+            SQSUnexpectedMessageError: If a message matching *body* is found.
+        """
+        time.sleep(self._compute_delay(delay))
+        response = self._client.receive_message(
+            QueueUrl=self._queue_url,
+            MaxNumberOfMessages=10,
+            VisibilityTimeout=0,
+            WaitTimeSeconds=0,
+        )
+        for message in response.get("Messages", []):
+            if message["Body"] == body:
+                raise SQSUnexpectedMessageError(self._queue_url, body, delay)
 
     @staticmethod
     def _compute_delay(poll_interval: float) -> int:

@@ -6,6 +6,7 @@ from aws_expect.exceptions import (
     DynamoDBNonNumericFieldError,
     DynamoDBWaitTimeoutError,
     S3WaitTimeoutError,
+    SQSUnexpectedMessageError,
     SQSWaitTimeoutError,
     WaitTimeoutError,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "S3ObjectExpectation",
     "S3WaitTimeoutError",
     "SQSQueueExpectation",
+    "SQSUnexpectedMessageError",
     "SQSWaitTimeoutError",
     "WaitTimeoutError",
     "expect_all",

@@ -3,7 +3,12 @@ import time
 
 import pytest
 
-from aws_expect import SQSWaitTimeoutError, WaitTimeoutError, expect_sqs
+from aws_expect import (
+    SQSUnexpectedMessageError,
+    SQSWaitTimeoutError,
+    WaitTimeoutError,
+    expect_sqs,
+)
 
 
 class TestSQSToHaveMessage:
@@ -167,3 +172,48 @@ class TestSQSToConsumeMessage:
             expect_sqs(sqs_queue).to_consume_message(
                 body="hello", timeout=2, poll_interval=1
             )
+
+
+class TestSQSToNotHaveMessage:
+    """Tests for expect_sqs(queue).to_not_have_message(body=...)."""
+
+    def test_returns_none_when_queue_is_empty(self, sqs_queue):
+        result = expect_sqs(sqs_queue).to_not_have_message(body="absent", delay=1)
+        assert result is None
+
+    def test_returns_none_when_different_body_present(self, sqs_queue):
+        sqs_queue.send_message(MessageBody="other")
+        result = expect_sqs(sqs_queue).to_not_have_message(body="absent", delay=1)
+        assert result is None
+        # clean up
+        sqs_queue.receive_messages(MaxNumberOfMessages=1)[0].delete()
+
+    def test_raises_when_message_present(self, sqs_queue):
+        sqs_queue.send_message(MessageBody="bad-message")
+
+        with pytest.raises(SQSUnexpectedMessageError) as exc_info:
+            expect_sqs(sqs_queue).to_not_have_message(body="bad-message", delay=1)
+
+        assert exc_info.value.body == "bad-message"
+        assert exc_info.value.delay == 1
+        assert exc_info.value.queue_url == sqs_queue.url
+
+    def test_message_remains_visible_after_failed_check(self, sqs_queue):
+        sqs_queue.send_message(MessageBody="present")
+
+        with pytest.raises(SQSUnexpectedMessageError):
+            expect_sqs(sqs_queue).to_not_have_message(body="present", delay=1)
+
+        # message must still be receivable (VisibilityTimeout=0)
+        messages = sqs_queue.receive_messages(MaxNumberOfMessages=1)
+        assert len(messages) == 1
+        assert messages[0].body == "present"
+        messages[0].delete()
+
+    def test_not_a_wait_timeout_error(self, sqs_queue):
+        sqs_queue.send_message(MessageBody="present")
+
+        with pytest.raises(SQSUnexpectedMessageError) as exc_info:
+            expect_sqs(sqs_queue).to_not_have_message(body="present", delay=1)
+
+        assert not isinstance(exc_info.value, WaitTimeoutError)

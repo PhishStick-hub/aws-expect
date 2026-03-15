@@ -104,6 +104,25 @@ class SQSWaitTimeoutError(WaitTimeoutError):
         )
 
 
+class SQSUnexpectedMessageError(Exception):
+    """Raised when a message that should be absent is found in an SQS queue.
+
+    Attributes:
+        queue_url: The URL of the SQS queue that was checked.
+        body: The message body that was unexpectedly found.
+        delay: The number of seconds waited before the check.
+    """
+
+    def __init__(self, queue_url: str, body: str, delay: float) -> None:
+        self.queue_url = queue_url
+        self.body = body
+        self.delay = delay
+        super().__init__(
+            f"Unexpected message with body={body!r} found in queue {queue_url}"
+            f" after {delay}s delay"
+        )
+
+
 class AggregateWaitTimeoutError(WaitTimeoutError):
     """Raised when one or more parallel expectations fail.
 
