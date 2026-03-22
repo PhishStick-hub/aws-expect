@@ -263,46 +263,6 @@ class SQSQueueExpectation:
             raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
-    def to_not_have_event(
-        self,
-        event: dict[str, Any],
-        delay: float,
-    ) -> None:
-        """Assert no message matching *event* is present after a fixed delay.
-
-        Sleeps for *delay* seconds (minimum 1 via :meth:`_compute_delay`), then
-        performs a single non-destructive receive_message check.
-
-        Args:
-            event: Dict of expected key-value pairs to match against parsed JSON body.
-            delay: Seconds to sleep before performing the check (minimum 1).
-
-        Returns:
-            ``None`` when no matching message is found.
-
-        Note:
-            At most 10 messages are inspected (SQS API limit). On queues with
-            many messages, a matching event may not be returned in the single
-            poll even if it is present.
-
-        Raises:
-            SQSUnexpectedEventError: If a matching message is found.
-        """
-        time.sleep(self._compute_delay(delay))
-        response = self._client.receive_message(
-            QueueUrl=self._queue_url,
-            MaxNumberOfMessages=10,
-            VisibilityTimeout=0,
-            WaitTimeSeconds=0,
-        )
-        for message in response.get("Messages", []):
-            try:
-                body = json.loads(message["Body"])
-            except (json.JSONDecodeError, ValueError):
-                continue
-            if isinstance(body, dict) and self._deep_matches(body, event):
-                raise SQSUnexpectedEventError(self._queue_url, event, delay)
-
     def to_consume_event(
         self,
         event: dict[str, Any],
@@ -366,3 +326,43 @@ class SQSQueueExpectation:
         except SQSWaitTimeoutError as exc:
             raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
         raise AssertionError("unreachable")  # pragma: no cover
+
+    def to_not_have_event(
+        self,
+        event: dict[str, Any],
+        delay: float,
+    ) -> None:
+        """Assert no message matching *event* is present after a fixed delay.
+
+        Sleeps for *delay* seconds (minimum 1 via :meth:`_compute_delay`), then
+        performs a single non-destructive receive_message check.
+
+        Args:
+            event: Dict of expected key-value pairs to match against parsed JSON body.
+            delay: Seconds to sleep before performing the check (minimum 1).
+
+        Returns:
+            ``None`` when no matching message is found.
+
+        Note:
+            At most 10 messages are inspected (SQS API limit). On queues with
+            many messages, a matching event may not be returned in the single
+            poll even if it is present.
+
+        Raises:
+            SQSUnexpectedEventError: If a matching message is found.
+        """
+        time.sleep(self._compute_delay(delay))
+        response = self._client.receive_message(
+            QueueUrl=self._queue_url,
+            MaxNumberOfMessages=10,
+            VisibilityTimeout=0,
+            WaitTimeSeconds=0,
+        )
+        for message in response.get("Messages", []):
+            try:
+                body = json.loads(message["Body"])
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if isinstance(body, dict) and self._deep_matches(body, event):
+                raise SQSUnexpectedEventError(self._queue_url, event, delay)
