@@ -1,8 +1,13 @@
+import json
 import math
 import time
 from typing import Any, Generator
 
-from aws_expect.exceptions import SQSUnexpectedMessageError, SQSWaitTimeoutError
+from aws_expect.exceptions import (
+    SQSEventWaitTimeoutError,
+    SQSUnexpectedMessageError,
+    SQSWaitTimeoutError,
+)
 
 
 class SQSQueueExpectation:
@@ -192,3 +197,67 @@ class SQSQueueExpectation:
     def _compute_delay(poll_interval: float) -> int:
         """Clamp poll_interval to a minimum of 1 and round up."""
         return max(1, math.ceil(poll_interval))
+
+    @staticmethod
+    def _deep_matches(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
+        """Check whether *actual* contains all key-value pairs in *expected*.
+
+        Recurses into nested dicts. Lists and all other types use exact equality.
+
+        Args:
+            actual: The parsed JSON dict from the SQS message body.
+            expected: The subset dict to match against.
+
+        Returns:
+            True if every key in *expected* is present in *actual* and matches.
+        """
+        for key, value in expected.items():
+            if key not in actual:
+                return False
+            if isinstance(value, dict):
+                if not isinstance(actual[key], dict):
+                    return False
+                if not SQSQueueExpectation._deep_matches(actual[key], value):
+                    return False
+            elif actual[key] != value:
+                return False
+        return True
+
+    def to_have_event(
+        self,
+        event: dict[str, Any],
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> dict[str, Any]:
+        """Wait for a message whose JSON body deep-matches *event*.
+
+        Non-destructive: messages are received with ``VisibilityTimeout=0``
+        so they remain visible and the queue state is unchanged.
+
+        Args:
+            event: Dict of expected key-value pairs. Matched recursively
+                against the parsed JSON body (subset match).
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+
+        Returns:
+            The matching SQS message dict (includes ``Body``, ``MessageId``,
+            ``ReceiptHandle``).
+
+        Raises:
+            SQSEventWaitTimeoutError: If no matching message appears within *timeout*.
+        """
+        try:
+            for messages in self._receive_batches(
+                str(event), timeout, poll_interval, visibility_timeout=0
+            ):
+                for message in messages:
+                    try:
+                        body = json.loads(message["Body"])
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    if isinstance(body, dict) and self._deep_matches(body, event):
+                        return message
+        except SQSWaitTimeoutError as exc:
+            raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
+        raise AssertionError("unreachable")  # pragma: no cover
