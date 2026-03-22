@@ -261,3 +261,67 @@ class SQSQueueExpectation:
         except SQSWaitTimeoutError as exc:
             raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
         raise AssertionError("unreachable")  # pragma: no cover
+
+    def to_consume_event(
+        self,
+        event: dict[str, Any],
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> dict[str, Any]:
+        """Wait for a message whose JSON body deep-matches *event* and delete it.
+
+        Destructive: the matching message is permanently deleted before returning.
+        Non-matching messages received in the same batch are immediately restored
+        via ``change_message_visibility(VisibilityTimeout=0)``.
+
+        Args:
+            event: Dict of expected key-value pairs. Matched recursively
+                against the parsed JSON body (subset match).
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+
+        Returns:
+            The consumed SQS message dict (includes ``Body``, ``MessageId``,
+            ``ReceiptHandle``).
+
+        Raises:
+            SQSEventWaitTimeoutError: If no matching message appears within *timeout*.
+        """
+        try:
+            for messages in self._receive_batches(
+                str(event), timeout, poll_interval, visibility_timeout=10
+            ):
+                matched: dict[str, Any] | None = None
+                for message in messages:
+                    try:
+                        body = json.loads(message["Body"])
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    if isinstance(body, dict) and self._deep_matches(body, event):
+                        matched = message
+                        break
+
+                if matched is not None:
+                    for message in messages:
+                        if message is not matched:
+                            self._client.change_message_visibility(
+                                QueueUrl=self._queue_url,
+                                ReceiptHandle=message["ReceiptHandle"],
+                                VisibilityTimeout=0,
+                            )
+                    self._client.delete_message(
+                        QueueUrl=self._queue_url,
+                        ReceiptHandle=matched["ReceiptHandle"],
+                    )
+                    return matched
+
+                # No match in this batch — restore all so they stay visible
+                for message in messages:
+                    self._client.change_message_visibility(
+                        QueueUrl=self._queue_url,
+                        ReceiptHandle=message["ReceiptHandle"],
+                        VisibilityTimeout=0,
+                    )
+        except SQSWaitTimeoutError as exc:
+            raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
+        raise AssertionError("unreachable")  # pragma: no cover
