@@ -30,13 +30,19 @@ class TestSQSToHaveEvent:
             poll_interval=1,
         )
 
-        assert json.loads(result["Body"]) == {"source": "my-app", "detail-type": "OrderPlaced"}
+        assert json.loads(result["Body"]) == {
+            "source": "my-app",
+            "detail-type": "OrderPlaced",
+        }
         assert "MessageId" in result
         assert "ReceiptHandle" in result
 
     def test_returns_message_on_subset_match(self, sqs_queue):
         """Extra fields in the body are ignored."""
-        _send_event(sqs_queue, {"source": "my-app", "detail-type": "OrderPlaced", "version": "0"})
+        _send_event(
+            sqs_queue,
+            {"source": "my-app", "detail-type": "OrderPlaced", "version": "0"},
+        )
 
         result = expect_sqs(sqs_queue).to_have_event(
             event={"source": "my-app"},
@@ -47,7 +53,10 @@ class TestSQSToHaveEvent:
         assert json.loads(result["Body"])["source"] == "my-app"
 
     def test_deep_nested_match(self, sqs_queue):
-        _send_event(sqs_queue, {"source": "my-app", "detail": {"orderId": "123", "status": "placed"}})
+        _send_event(
+            sqs_queue,
+            {"source": "my-app", "detail": {"orderId": "123", "status": "placed"}},
+        )
 
         result = expect_sqs(sqs_queue).to_have_event(
             event={"detail": {"orderId": "123"}},
