@@ -57,6 +57,13 @@ All custom waiters follow the same structure:
 2. Loop: attempt check → success → return; failure → sleep `min(poll_interval, remaining)` → check deadline → raise on expiry
 3. Always attempt at least one check before raising timeout
 
+### SQS-Specific Patterns
+
+- **`_receive_batches` raises `SQSWaitTimeoutError`** — callers that need a different exception type must wrap the loop in `try/except SQSWaitTimeoutError` and re-raise; pass `str(event)` as the `body` placeholder if the method doesn't work with string bodies.
+- **Method triplet order**: `to_have_*` → `to_consume_*` → `to_not_have_*` (matches the existing string-body ordering).
+- **Test files**: one file per concern — `test_sqs.py` for string-body methods, `test_sqs_event.py` for JSON event methods.
+- **Deferred imports**: during TDD RED phase, don't import exceptions that aren't used yet — ruff F401 will fail.
+
 ### Testing
 
 Tests use `testcontainers[localstack]` for a session-scoped LocalStack container. Fixtures in `tests/conftest.py` provide session-scoped clients and function-scoped buckets/tables/queues with unique names. Tests use `threading.Timer` to simulate async resource creation. Use short timeouts (2–10 s) in tests.
