@@ -123,6 +123,51 @@ class SQSUnexpectedMessageError(Exception):
         )
 
 
+class SQSEventWaitTimeoutError(WaitTimeoutError):
+    """Raised when to_have_event / to_consume_event exceeds timeout.
+
+    Inherits WaitTimeoutError directly (not SQSWaitTimeoutError) because
+    it stores event: dict[str, Any] rather than body: str. Callers that
+    catch SQSWaitTimeoutError will NOT catch this exception; they must
+    catch SQSEventWaitTimeoutError or the common base WaitTimeoutError.
+
+    Attributes:
+        queue_url: URL of the SQS queue that was polled.
+        event: The event subset dict that was not found.
+        timeout: The timeout that was configured for the wait.
+    """
+
+    def __init__(self, queue_url: str, event: dict[str, Any], timeout: float) -> None:
+        self.queue_url = queue_url
+        self.event = event
+        self.timeout = timeout
+        super().__init__(
+            f"Timed out after {timeout}s waiting for event matching {event!r}"
+            f" in queue {queue_url}"
+        )
+
+
+class SQSUnexpectedEventError(Exception):
+    """Raised when to_not_have_event finds a matching event.
+
+    Does NOT inherit WaitTimeoutError — mirrors SQSUnexpectedMessageError.
+
+    Attributes:
+        queue_url: URL of the SQS queue that was checked.
+        event: The event subset dict that was unexpectedly found.
+        delay: The number of seconds waited before the check.
+    """
+
+    def __init__(self, queue_url: str, event: dict[str, Any], delay: float) -> None:
+        self.queue_url = queue_url
+        self.event = event
+        self.delay = delay
+        super().__init__(
+            f"Unexpected event matching {event!r} found in queue {queue_url}"
+            f" after {delay}s delay"
+        )
+
+
 class AggregateWaitTimeoutError(WaitTimeoutError):
     """Raised when one or more parallel expectations fail.
 
