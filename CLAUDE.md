@@ -71,7 +71,7 @@ Tests use `testcontainers[localstack]` for a session-scoped LocalStack container
 ## Conventions
 
 - **Python 3.13+**, full type annotations required on all code
-- **Commit format**: Conventional Commits with scope — `feat(s3): ...`, `fix(dynamodb): ...`, `chore(ci): ...`; breaking changes use `!` (e.g., `feat(s3)!: ...`)
+- **Commit format**: Conventional Commits with scope — `feat(s3): ...`, `fix(dynamodb): ...`, `chore(ci): ...`; breaking changes use `!` (e.g., `feat(s3)!: ...`). Never add AI tool attribution (e.g., "Generated with Claude Code") to commit messages or PR bodies.
 - **Imports**: stdlib → third-party → local, absolute only
 - **Exceptions**: all timeout exceptions inherit `WaitTimeoutError`; use `raise NewError(...) from exc` for chaining
 - **Docstrings**: Google-style for public API methods
