@@ -21,7 +21,7 @@ class SQSQueueExpectation:
 
     def _receive_batches(
         self,
-        body: str,
+        error_hint: str,
         timeout: float,
         poll_interval: float,
         visibility_timeout: int,
@@ -32,7 +32,7 @@ class SQSQueueExpectation:
         receive_message call, sleep, and SQSWaitTimeoutError on expiry.
 
         Args:
-            body: Expected message body — used only in the timeout error.
+            error_hint: String included in the timeout error (body or str(event)).
             timeout: Maximum seconds to poll.
             poll_interval: Seconds between polls (minimum 1).
             visibility_timeout: VisibilityTimeout passed to receive_message.
@@ -57,7 +57,7 @@ class SQSQueueExpectation:
             yield response.get("Messages", [])
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise SQSWaitTimeoutError(self._queue_url, body, timeout)
+                raise SQSWaitTimeoutError(self._queue_url, error_hint, timeout)
             time.sleep(min(delay, remaining))
 
     def to_have_message(
@@ -135,13 +135,7 @@ class SQSQueueExpectation:
                     break
 
             if matched is not None:
-                for message in messages:
-                    if message is not matched:
-                        self._client.change_message_visibility(
-                            QueueUrl=self._queue_url,
-                            ReceiptHandle=message["ReceiptHandle"],
-                            VisibilityTimeout=0,
-                        )
+                self._restore_messages(messages, exclude=matched)
                 self._client.delete_message(
                     QueueUrl=self._queue_url,
                     ReceiptHandle=matched["ReceiptHandle"],
@@ -149,12 +143,7 @@ class SQSQueueExpectation:
                 return matched
 
             # No match — restore all received messages so they stay visible
-            for message in messages:
-                self._client.change_message_visibility(
-                    QueueUrl=self._queue_url,
-                    ReceiptHandle=message["ReceiptHandle"],
-                    VisibilityTimeout=0,
-                )
+            self._restore_messages(messages)
         raise AssertionError("unreachable")  # pragma: no cover
 
     def to_not_have_message(
@@ -193,6 +182,43 @@ class SQSQueueExpectation:
         for message in response.get("Messages", []):
             if message["Body"] == body:
                 raise SQSUnexpectedMessageError(self._queue_url, body, delay)
+
+    def _restore_messages(
+        self,
+        messages: list[dict[str, Any]],
+        exclude: dict[str, Any] | None = None,
+    ) -> None:
+        """Restore visibility=0 for all messages in *messages* except *exclude*.
+
+        Args:
+            messages: Batch of SQS message dicts to restore.
+            exclude: Single message to skip (e.g. the one being deleted). If
+                ``None`` every message in the batch is restored.
+        """
+        for message in messages:
+            if message is not exclude:
+                self._client.change_message_visibility(
+                    QueueUrl=self._queue_url,
+                    ReceiptHandle=message["ReceiptHandle"],
+                    VisibilityTimeout=0,
+                )
+
+    def _matches_event(self, message: dict[str, Any], event: dict[str, Any]) -> bool:
+        """Return True if the message body is valid JSON and deep-matches *event*.
+
+        Args:
+            message: SQS message dict with a ``Body`` key.
+            event: Dict of expected key-value pairs for subset matching.
+
+        Returns:
+            True when the parsed body is a dict containing all key-value pairs
+            in *event* (recursively). False on JSON parse errors or type mismatch.
+        """
+        try:
+            body = json.loads(message["Body"])
+        except (json.JSONDecodeError, ValueError):
+            return False
+        return isinstance(body, dict) and self._deep_matches(body, event)
 
     @staticmethod
     def _compute_delay(poll_interval: float) -> int:
@@ -253,11 +279,7 @@ class SQSQueueExpectation:
                 str(event), timeout, poll_interval, visibility_timeout=0
             ):
                 for message in messages:
-                    try:
-                        body = json.loads(message["Body"])
-                    except (json.JSONDecodeError, ValueError):
-                        continue
-                    if isinstance(body, dict) and self._deep_matches(body, event):
+                    if self._matches_event(message, event):
                         return message
         except SQSWaitTimeoutError as exc:
             raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
@@ -294,22 +316,12 @@ class SQSQueueExpectation:
             ):
                 matched: dict[str, Any] | None = None
                 for message in messages:
-                    try:
-                        body = json.loads(message["Body"])
-                    except (json.JSONDecodeError, ValueError):
-                        continue
-                    if isinstance(body, dict) and self._deep_matches(body, event):
+                    if self._matches_event(message, event):
                         matched = message
                         break
 
                 if matched is not None:
-                    for message in messages:
-                        if message is not matched:
-                            self._client.change_message_visibility(
-                                QueueUrl=self._queue_url,
-                                ReceiptHandle=message["ReceiptHandle"],
-                                VisibilityTimeout=0,
-                            )
+                    self._restore_messages(messages, exclude=matched)
                     self._client.delete_message(
                         QueueUrl=self._queue_url,
                         ReceiptHandle=matched["ReceiptHandle"],
@@ -317,12 +329,7 @@ class SQSQueueExpectation:
                     return matched
 
                 # No match in this batch — restore all so they stay visible
-                for message in messages:
-                    self._client.change_message_visibility(
-                        QueueUrl=self._queue_url,
-                        ReceiptHandle=message["ReceiptHandle"],
-                        VisibilityTimeout=0,
-                    )
+                self._restore_messages(messages)
         except SQSWaitTimeoutError as exc:
             raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
         raise AssertionError("unreachable")  # pragma: no cover
@@ -360,9 +367,5 @@ class SQSQueueExpectation:
             WaitTimeSeconds=0,
         )
         for message in response.get("Messages", []):
-            try:
-                body = json.loads(message["Body"])
-            except (json.JSONDecodeError, ValueError):
-                continue
-            if isinstance(body, dict) and self._deep_matches(body, event):
+            if self._matches_event(message, event):
                 raise SQSUnexpectedEventError(self._queue_url, event, delay)
