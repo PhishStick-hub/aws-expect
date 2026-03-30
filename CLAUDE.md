@@ -38,6 +38,22 @@ uv build
 
 All four checks (pytest, ty, ruff check, ruff format) must pass before merging.
 
+## Git Workflow
+
+- Always run the full test suite (`uv run pytest tests/ -v`) before committing
+- Release tagging order: bump version → commit → tag the latest commit → push with `--tags`
+- Never add Co-authored-by or other AI tool attribution to commit messages or PR bodies
+
+## Research Before Coding
+
+- Always check Context7 MCP or official documentation before implementing AWS/API solutions
+- When reviewing code, use current docs (via Context7) to enrich the review — don't wait to be asked
+
+## Python Toolchain
+
+- Use `uv` for package management, `ruff` for linting/formatting, `ty` for type checking
+- Use the boto3 resource API where available; fall back to the client API only when no resource interface exists (e.g., EventBridge)
+
 ## Architecture
 
 ### Package Structure (`aws_expect/`)
@@ -59,7 +75,7 @@ All custom waiters follow the same structure:
 
 ### SQS-Specific Patterns
 
-- **`_receive_batches` raises `SQSWaitTimeoutError`** — callers that need a different exception type must wrap the loop in `try/except SQSWaitTimeoutError` and re-raise; pass `str(event)` as the `body` placeholder if the method doesn't work with string bodies.
+- **`_receive_batches` raises `SQSWaitTimeoutError`** — callers that need a different exception type must wrap the loop in `try/except SQSWaitTimeoutError` and re-raise; pass `str(event)` as the `error_hint` argument for event methods.
 - **Method triplet order**: `to_have_*` → `to_consume_*` → `to_not_have_*` (matches the existing string-body ordering).
 - **Test files**: one file per concern — `test_sqs.py` for string-body methods, `test_sqs_event.py` for JSON event methods.
 - **Deferred imports**: during TDD RED phase, don't import exceptions that aren't used yet — ruff F401 will fail.
