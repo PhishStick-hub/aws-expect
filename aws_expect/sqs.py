@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import json
 import math
 import time
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any, Generator
 
 from aws_expect.exceptions import (
     SQSEventWaitTimeoutError,
@@ -10,11 +12,15 @@ from aws_expect.exceptions import (
     SQSWaitTimeoutError,
 )
 
+if TYPE_CHECKING:
+    from mypy_boto3_sqs.service_resource import Queue as SQSQueue
+    from mypy_boto3_sqs.type_defs import MessageTypeDef
+
 
 class SQSQueueExpectation:
     """Expectation wrapper for a boto3 SQS Queue resource."""
 
-    def __init__(self, queue: Any) -> None:
+    def __init__(self, queue: SQSQueue) -> None:
         self._queue = queue
         self._queue_url: str = queue.url
         self._client = queue.meta.client
@@ -25,7 +31,7 @@ class SQSQueueExpectation:
         timeout: float,
         poll_interval: float,
         visibility_timeout: int,
-    ) -> Generator[list[dict[str, Any]], None, None]:
+    ) -> Generator[list[MessageTypeDef], None, None]:
         """Yield batches of messages from the queue until timeout.
 
         Handles the polling loop: delay computation, deadline tracking,
@@ -65,7 +71,7 @@ class SQSQueueExpectation:
         body: str,
         timeout: float = 30,
         poll_interval: float = 5,
-    ) -> dict[str, Any]:
+    ) -> MessageTypeDef:
         """Wait for a message with the given body to be present in the queue.
 
         Non-destructive: messages are received with ``VisibilityTimeout=0``
@@ -101,7 +107,7 @@ class SQSQueueExpectation:
         body: str,
         timeout: float = 30,
         poll_interval: float = 5,
-    ) -> dict[str, Any]:
+    ) -> MessageTypeDef:
         """Wait for a message with the given body and delete it from the queue.
 
         Destructive: the matching message is permanently deleted before returning.
@@ -128,7 +134,7 @@ class SQSQueueExpectation:
         for messages in self._receive_batches(
             body, timeout, poll_interval, visibility_timeout=10
         ):
-            matched: dict[str, Any] | None = None
+            matched: MessageTypeDef | None = None
             for message in messages:
                 if message["Body"] == body:
                     matched = message
@@ -185,8 +191,8 @@ class SQSQueueExpectation:
 
     def _restore_messages(
         self,
-        messages: list[dict[str, Any]],
-        exclude: dict[str, Any] | None = None,
+        messages: list[MessageTypeDef],
+        exclude: MessageTypeDef | None = None,
     ) -> None:
         """Restore visibility=0 for all messages in *messages* except *exclude*.
 
@@ -203,7 +209,7 @@ class SQSQueueExpectation:
                     VisibilityTimeout=0,
                 )
 
-    def _matches_event(self, message: dict[str, Any], event: dict[str, Any]) -> bool:
+    def _matches_event(self, message: MessageTypeDef, event: dict[str, Any]) -> bool:
         """Return True if the message body is valid JSON and deep-matches *event*.
 
         Args:
@@ -255,7 +261,7 @@ class SQSQueueExpectation:
         event: dict[str, Any],
         timeout: float = 30,
         poll_interval: float = 5,
-    ) -> dict[str, Any]:
+    ) -> MessageTypeDef:
         """Wait for a message whose JSON body deep-matches *event*.
 
         Non-destructive: messages are received with ``VisibilityTimeout=0``
@@ -290,7 +296,7 @@ class SQSQueueExpectation:
         event: dict[str, Any],
         timeout: float = 30,
         poll_interval: float = 5,
-    ) -> dict[str, Any]:
+    ) -> MessageTypeDef:
         """Wait for a message whose JSON body deep-matches *event* and delete it.
 
         Destructive: the matching message is permanently deleted before returning.
@@ -314,7 +320,7 @@ class SQSQueueExpectation:
             for messages in self._receive_batches(
                 str(event), timeout, poll_interval, visibility_timeout=10
             ):
-                matched: dict[str, Any] | None = None
+                matched: MessageTypeDef | None = None
                 for message in messages:
                     if self._matches_event(message, event):
                         matched = message

@@ -35,6 +35,11 @@ Issues = "https://github.com/PhishStick-hub/aws-expect/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["aws_expect"]
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:testcontainers.*",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from aws_expect.dynamodb import DynamoDBItemExpectation, DynamoDBTableExpectation
 from aws_expect.lambda_function import LambdaFunctionExpectation
@@ -8,10 +8,13 @@ from aws_expect.s3 import S3ObjectExpectation
 from aws_expect.sqs import SQSQueueExpectation
 
 if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource, Table
     from mypy_boto3_lambda.client import LambdaClient
+    from mypy_boto3_s3.service_resource import Object as S3Object
+    from mypy_boto3_sqs.service_resource import Queue as SQSQueue
 
 
-def expect_s3(s3_object: Any) -> S3ObjectExpectation:
+def expect_s3(s3_object: S3Object) -> S3ObjectExpectation:
     """Create an expectation for an S3 resource Object.
 
     Args:
@@ -34,7 +37,7 @@ def expect_s3(s3_object: Any) -> S3ObjectExpectation:
     return S3ObjectExpectation(s3_object)
 
 
-def expect_dynamodb_item(table: Any) -> DynamoDBItemExpectation:
+def expect_dynamodb_item(table: Table) -> DynamoDBItemExpectation:
     """Create an expectation for a DynamoDB Table resource item.
 
     Args:
@@ -58,7 +61,7 @@ def expect_dynamodb_item(table: Any) -> DynamoDBItemExpectation:
 
 
 def expect_dynamodb_table(
-    dynamodb_resource: Any, table_name: str
+    dynamodb_resource: DynamoDBServiceResource, table_name: str
 ) -> DynamoDBTableExpectation:
     """Create an expectation for a DynamoDB table.
 
@@ -107,7 +110,7 @@ def expect_lambda(lambda_client: LambdaClient) -> LambdaFunctionExpectation:
     return LambdaFunctionExpectation(lambda_client)
 
 
-def expect_sqs(queue: Any) -> SQSQueueExpectation:
+def expect_sqs(queue: SQSQueue) -> SQSQueueExpectation:
     """Create an expectation for a boto3 SQS Queue resource.
 
     Args:

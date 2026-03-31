@@ -1,28 +1,50 @@
+from __future__ import annotations
+
 import json
 import math
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any, overload
 
 from botocore.exceptions import ClientError, WaiterError
 
 from aws_expect.exceptions import S3WaitTimeoutError
 
+if TYPE_CHECKING:
+    from mypy_boto3_s3.service_resource import Object as S3Object
+    from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef
+
 
 class S3ObjectExpectation:
     """Expectation wrapper for an S3 resource Object, using native boto3 waiters."""
 
-    def __init__(self, s3_object: Any) -> None:
+    def __init__(self, s3_object: S3Object) -> None:
         self._obj = s3_object
         self._bucket = s3_object.bucket_name
         self._key = s3_object.key
         self._client = s3_object.meta.client
+
+    @overload
+    def to_exist(
+        self,
+        timeout: float = ...,
+        poll_interval: float = ...,
+        entries: dict[str, Any] = ...,
+    ) -> dict[str, Any]: ...
+
+    @overload
+    def to_exist(
+        self,
+        timeout: float = ...,
+        poll_interval: float = ...,
+        entries: None = ...,
+    ) -> HeadObjectOutputTypeDef: ...
 
     def to_exist(
         self,
         timeout: float = 30,
         poll_interval: float = 5,
         entries: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> HeadObjectOutputTypeDef | dict[str, Any]:
         """Wait for the S3 object to exist and optionally match *entries*.
 
         When *entries* is ``None`` the native ``object_exists`` waiter is used
