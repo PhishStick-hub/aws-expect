@@ -58,10 +58,11 @@ All four checks (pytest, ty, ruff check, ruff format) must pass before merging.
 
 ### Package Structure (`aws_expect/`)
 
-- **`expect.py`** — Factory functions: `expect_s3()`, `expect_dynamodb_item()`, `expect_dynamodb_table()`, `expect_sqs()`
+- **`expect.py`** — Factory functions: `expect_s3()`, `expect_dynamodb_item()`, `expect_dynamodb_table()`, `expect_sqs()`, `expect_lambda()`
 - **`s3.py`** — `S3ObjectExpectation`: wraps a boto3 S3 Object resource; uses native boto3 waiters for existence, custom polling for JSON content matching
 - **`dynamodb.py`** — `DynamoDBItemExpectation` (wraps a Table resource) and `DynamoDBTableExpectation` (wraps dynamodb resource + table name string); custom polling throughout
 - **`sqs.py`** — `SQSQueueExpectation`: wraps a boto3 SQS Queue resource; string-body methods (`to_have_message`, `to_consume_message`, `to_not_have_message`) and JSON event methods (`to_have_event`, `to_consume_event`, `to_not_have_event`) with deep recursive subset matching via `_deep_matches`
+- **`lambda_function.py`** — `LambdaFunctionExpectation`: wraps a boto3 Lambda **client** (no resource API exists); function name passed per method call. Methods: `to_exist`, `to_not_exist`, `to_be_active`, `to_be_updated` use native boto3 waiters; `to_be_invocable` uses custom polling with optional payload and entries subset matching.
 - **`parallel.py`** — `expect_all()`: runs multiple zero-argument callables concurrently via ThreadPoolExecutor; returns ordered results or raises `AggregateWaitTimeoutError`
 - **`exceptions.py`** — Exception hierarchy rooted at `WaitTimeoutError`; each subclass stores relevant context. `SQSUnexpectedMessageError` and `SQSUnexpectedEventError` inherit `Exception` directly (not `WaitTimeoutError`) as they represent unexpected presence, not a timeout.
 - **`__init__.py`** — Defines `__all__` as the public API
@@ -82,7 +83,9 @@ All custom waiters follow the same structure:
 
 ### Testing
 
-Tests use `testcontainers[localstack]` for a session-scoped LocalStack container. Fixtures in `tests/conftest.py` provide session-scoped clients and function-scoped buckets/tables/queues with unique names. Tests use `threading.Timer` to simulate async resource creation. Use short timeouts (2–10 s) in tests.
+Tests use `testcontainers[localstack]` for a session-scoped LocalStack container. Fixtures in `tests/conftest.py` provide session-scoped clients and function-scoped buckets/tables/queues/functions with unique names. Tests use `threading.Timer` to simulate async resource creation. Use short timeouts (2–10 s) in tests.
+
+**Lambda testing**: LocalStack 4 requires the Docker socket to be mounted (`/var/run/docker.sock`) for Lambda execution. The `localstack` fixture does this automatically. The `lambda_function` fixture creates a Python 3.13 function from an in-memory zip and waits for `function_active_v2` before yielding; teardown ignores `ResourceNotFoundException` in case the test already deleted the function.
 
 ## Conventions
 

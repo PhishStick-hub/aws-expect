@@ -5,6 +5,7 @@ from aws_expect.exceptions import (
     AggregateWaitTimeoutError,
     DynamoDBNonNumericFieldError,
     DynamoDBWaitTimeoutError,
+    LambdaWaitTimeoutError,
     S3WaitTimeoutError,
     SQSEventWaitTimeoutError,
     SQSUnexpectedEventError,
@@ -15,9 +16,11 @@ from aws_expect.exceptions import (
 from aws_expect.expect import (
     expect_dynamodb_item,
     expect_dynamodb_table,
+    expect_lambda,
     expect_s3,
     expect_sqs,
 )
+from aws_expect.lambda_function import LambdaFunctionExpectation
 from aws_expect.parallel import expect_all
 from aws_expect.s3 import S3ObjectExpectation
 from aws_expect.sqs import SQSQueueExpectation
@@ -28,6 +31,8 @@ __all__ = [
     "DynamoDBNonNumericFieldError",
     "DynamoDBTableExpectation",
     "DynamoDBWaitTimeoutError",
+    "LambdaFunctionExpectation",
+    "LambdaWaitTimeoutError",
     "S3ObjectExpectation",
     "S3WaitTimeoutError",
     "SQSEventWaitTimeoutError",
@@ -39,6 +44,7 @@ __all__ = [
     "expect_all",
     "expect_dynamodb_item",
     "expect_dynamodb_table",
+    "expect_lambda",
     "expect_s3",
     "expect_sqs",
 ]

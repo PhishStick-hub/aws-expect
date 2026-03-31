@@ -12,7 +12,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "boto3-stubs", extra = ["dynamodb", "s3", "sqs"] },
+    { name = "boto3-stubs", extra = ["dynamodb", "lambda", "s3", "sqs"] },
     { name = "pytest" },
     { name = "ruff" },
     { name = "testcontainers", extra = ["localstack"] },
@@ -24,7 +24,7 @@ requires-dist = [{ name = "boto3", specifier = ">=1.35.0" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "boto3-stubs", extras = ["dynamodb", "s3", "sqs"], specifier = ">=1.35.0" },
+    { name = "boto3-stubs", extras = ["dynamodb", "lambda", "s3", "sqs"], specifier = ">=1.35.0" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "ruff", specifier = ">=0.15.2" },
     { name = "testcontainers", extras = ["localstack"], specifier = ">=4.10.0" },
@@ -61,6 +61,9 @@ wheels = [
 [package.optional-dependencies]
 dynamodb = [
     { name = "mypy-boto3-dynamodb" },
+]
+lambda = [
+    { name = "mypy-boto3-lambda" },
 ]
 s3 = [
     { name = "mypy-boto3-s3" },
@@ -202,6 +205,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ae/3f/34530be07d07e4187304c8e02d6dba487abc6d2e1dc4c10301c6258282e1/mypy_boto3_dynamodb-1.42.41.tar.gz", hash = "sha256:6102c5ecf25b1ef485274ca9c6af79eb76f66200cd075515edd2b96565f9892d", size = 48617, upload-time = "2026-02-03T21:05:37.67Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e8/99/83a4cd943648eaf37d87f910afd43a09d6bd028f4d5108eefed858d8e69d/mypy_boto3_dynamodb-1.42.41-py3-none-any.whl", hash = "sha256:0e0f33d9babb17e7b1308e0dba3dcf1145115a0ceb354b5426e44cc68c44a5a1", size = 58701, upload-time = "2026-02-03T21:05:33.772Z" },
+]
+
+[[package]]
+name = "mypy-boto3-lambda"
+version = "1.42.37"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/a8/caec8f9a196143f991c603b9364b0a1300b5c54d0c833c6c1dc792b3050c/mypy_boto3_lambda-1.42.37.tar.gz", hash = "sha256:94f7f0708f9b5ffa5b8b3eb6d564be1ef402ebb8b8cd96045332b7a3bc1ea0e0", size = 51821, upload-time = "2026-01-28T20:51:44.74Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/4c/d172fac61aa689c96fe286e7adb9774e5094f5c0a52fa1a6888699b47d7f/mypy_boto3_lambda-1.42.37-py3-none-any.whl", hash = "sha256:9614518cbe3c300d3d1e2d9c3d857c3829c44a8544c4cd4ca393d35181b22619", size = 60175, upload-time = "2026-01-28T20:51:39.865Z" },
 ]
 
 [[package]]
