@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from http import HTTPStatus
+
 import pytest
 from mypy_boto3_lambda.client import LambdaClient
 
@@ -16,7 +18,7 @@ class TestToBeInvocable:
         result = expect_lambda(lambda_client).to_be_invocable(
             lambda_function, timeout=10, poll_interval=1
         )
-        assert result["statusCode"] == 200
+        assert result["statusCode"] == HTTPStatus.OK
 
     def test_returns_payload_with_event_payload(
         self, lambda_client: LambdaClient, lambda_function: str
@@ -27,7 +29,7 @@ class TestToBeInvocable:
             poll_interval=1,
             payload={"key": "value"},
         )
-        assert result["statusCode"] == 200
+        assert result["statusCode"] == HTTPStatus.OK
 
     def test_succeeds_with_matching_entries(
         self, lambda_client: LambdaClient, lambda_function: str
@@ -36,9 +38,9 @@ class TestToBeInvocable:
             lambda_function,
             timeout=10,
             poll_interval=1,
-            entries={"statusCode": 200},
+            entries={"statusCode": HTTPStatus.OK},
         )
-        assert result["statusCode"] == 200
+        assert result["statusCode"] == HTTPStatus.OK
 
     def test_raises_when_entries_do_not_match(
         self, lambda_client: LambdaClient, lambda_function: str

@@ -145,6 +145,12 @@ def _error_handler(event, context):
     raise RuntimeError("intentional error")
 
 
+def _json_body_handler(event, context):
+    import json  # noqa: PLC0415
+
+    return {"statusCode": 200, "body": json.dumps({"message": "hello", "status": "ok"})}
+
+
 @pytest.fixture(scope="session")
 def lambda_client(localstack: LocalStackContainer) -> LambdaClient:
     """Create a boto3 Lambda client connected to the LocalStack container."""
@@ -167,6 +173,23 @@ def lambda_function(lambda_client: LambdaClient) -> Iterator[str]:
         Role=_LAMBDA_ROLE,
         Handler="handler.handler",
         Code={"ZipFile": _make_lambda_zip(_default_handler)},
+    )
+    lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)
+    yield function_name
+    with suppress(lambda_client.exceptions.ResourceNotFoundException):
+        lambda_client.delete_function(FunctionName=function_name)
+
+
+@pytest.fixture()
+def lambda_function_json_body(lambda_client: LambdaClient) -> Iterator[str]:
+    """Create a Lambda function returning a JSON-encoded body field for respond_with tests."""
+    function_name = f"test-json-{uuid4().hex[:12]}"
+    lambda_client.create_function(
+        FunctionName=function_name,
+        Runtime="python3.13",
+        Role=_LAMBDA_ROLE,
+        Handler="handler.handler",
+        Code={"ZipFile": _make_lambda_zip(_json_body_handler)},
     )
     lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)
     yield function_name

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from botocore.exceptions import ClientError, WaiterError
 
-from aws_expect.exceptions import LambdaWaitTimeoutError
+from aws_expect.exceptions import LambdaResponseMismatchError, LambdaWaitTimeoutError
 
 if TYPE_CHECKING:
     from mypy_boto3_lambda.client import LambdaClient
@@ -213,12 +213,74 @@ class LambdaFunctionExpectation:
                 raise LambdaWaitTimeoutError(function_name, timeout)
             time.sleep(min(delay, remaining))
 
+    def to_respond_with(
+        self,
+        function_name: str,
+        *,
+        status_code: int | None = None,
+        body: dict[str, Any] | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Invoke a Lambda function once and assert the expected status code and/or body.
+
+        Invokes the function a single time. Succeeds when the response has no
+        ``FunctionError``, ``statusCode`` matches *status_code* (if given), and the
+        JSON-parsed ``body`` field contains all entries in *body* (subset match, if given).
+
+        Args:
+            function_name: Name or ARN of the Lambda function.
+            status_code: Expected value of ``statusCode`` in the response payload.
+            body: Expected key-value pairs in the JSON-parsed ``body`` field (subset match).
+            payload: Optional dict to send as the invocation event (JSON-serialized).
+
+        Returns:
+            The full parsed Lambda response payload dict on success.
+
+        Raises:
+            LambdaResponseMismatchError: If the response has a ``FunctionError`` or does
+                not match the expected *status_code* / *body*.
+        """
+        invoke_kwargs: dict[str, Any] = {"FunctionName": function_name}
+        if payload is not None:
+            invoke_kwargs["Payload"] = json.dumps(payload).encode()
+
+        response = self._client.invoke(**invoke_kwargs)
+        if response.get("FunctionError"):
+            raise LambdaResponseMismatchError(function_name, {})
+        response_payload: dict[str, Any] = json.loads(response["Payload"].read())
+        if not self._matches_response(response_payload, status_code, body):
+            raise LambdaResponseMismatchError(function_name, response_payload)
+        return response_payload
+
     @staticmethod
     def _build_waiter_config(timeout: float, poll_interval: float) -> dict[str, int]:
         """Convert timeout/poll_interval into a botocore WaiterConfig dict."""
         delay = max(1, math.ceil(poll_interval))
         max_attempts = max(1, math.ceil(timeout / delay))
         return {"Delay": delay, "MaxAttempts": max_attempts}
+
+    @staticmethod
+    def _matches_response(
+        payload: dict[str, Any],
+        status_code: int | None,
+        body: dict[str, Any] | None,
+    ) -> bool:
+        """Check that *payload* satisfies the expected *status_code* and *body*.
+
+        *body* is matched against the JSON-parsed ``body`` field of *payload*
+        using a shallow subset match. Returns ``False`` if the ``body`` field
+        is missing or not valid JSON when *body* entries are requested.
+        """
+        if status_code is not None and payload.get("statusCode") != status_code:
+            return False
+        if body is not None:
+            try:
+                parsed_body: dict[str, Any] = json.loads(payload.get("body", ""))
+            except (ValueError, TypeError):
+                return False
+            if not all(parsed_body.get(k) == v for k, v in body.items()):
+                return False
+        return True
 
     @staticmethod
     def _matches_entries(data: dict[str, Any], entries: dict[str, Any]) -> bool:
