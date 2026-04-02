@@ -1,11 +1,20 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from aws_expect.dynamodb import DynamoDBItemExpectation, DynamoDBTableExpectation
+from aws_expect.lambda_function import LambdaFunctionExpectation
 from aws_expect.s3 import S3ObjectExpectation
 from aws_expect.sqs import SQSQueueExpectation
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource, Table
+    from mypy_boto3_lambda.client import LambdaClient
+    from mypy_boto3_s3.service_resource import Object as S3Object
+    from mypy_boto3_sqs.service_resource import Queue as SQSQueue
 
-def expect_s3(s3_object: Any) -> S3ObjectExpectation:
+
+def expect_s3(s3_object: S3Object) -> S3ObjectExpectation:
     """Create an expectation for an S3 resource Object.
 
     Args:
@@ -28,7 +37,7 @@ def expect_s3(s3_object: Any) -> S3ObjectExpectation:
     return S3ObjectExpectation(s3_object)
 
 
-def expect_dynamodb_item(table: Any) -> DynamoDBItemExpectation:
+def expect_dynamodb_item(table: Table) -> DynamoDBItemExpectation:
     """Create an expectation for a DynamoDB Table resource item.
 
     Args:
@@ -52,7 +61,7 @@ def expect_dynamodb_item(table: Any) -> DynamoDBItemExpectation:
 
 
 def expect_dynamodb_table(
-    dynamodb_resource: Any, table_name: str
+    dynamodb_resource: DynamoDBServiceResource, table_name: str
 ) -> DynamoDBTableExpectation:
     """Create an expectation for a DynamoDB table.
 
@@ -79,7 +88,29 @@ def expect_dynamodb_table(
     return DynamoDBTableExpectation(dynamodb_resource, table_name)
 
 
-def expect_sqs(queue: Any) -> SQSQueueExpectation:
+def expect_lambda(lambda_client: LambdaClient) -> LambdaFunctionExpectation:
+    """Create an expectation for a Lambda function.
+
+    Args:
+        lambda_client: A boto3 Lambda client
+            (``boto3.client("lambda")``).
+
+    Returns:
+        A :class:`LambdaFunctionExpectation` whose methods each accept a
+        *function_name* and wait for the requested state.
+
+    Example::
+
+        import boto3
+        from aws_expect import expect_lambda
+
+        client = boto3.client("lambda")
+        expect_lambda(client).to_be_active("my-function", timeout=60)
+    """
+    return LambdaFunctionExpectation(lambda_client)
+
+
+def expect_sqs(queue: SQSQueue) -> SQSQueueExpectation:
     """Create an expectation for a boto3 SQS Queue resource.
 
     Args:

@@ -91,6 +91,22 @@ class DynamoDBNonNumericFieldError(WaitTimeoutError):
         )
 
 
+class LambdaWaitTimeoutError(WaitTimeoutError):
+    """Raised when a Lambda wait operation exceeds the specified timeout.
+
+    Attributes:
+        function_name: Name or ARN of the Lambda function that was waited on.
+        timeout: The timeout that was configured for the wait operation.
+    """
+
+    def __init__(self, function_name: str, timeout: float) -> None:
+        self.function_name = function_name
+        self.timeout = timeout
+        super().__init__(
+            f"Timed out after {timeout}s waiting for Lambda function {function_name!r}"
+        )
+
+
 class SQSWaitTimeoutError(WaitTimeoutError):
     """Raised when an SQS wait operation exceeds the specified timeout."""
 

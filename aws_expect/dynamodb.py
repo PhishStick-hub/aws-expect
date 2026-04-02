@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import math
 import time
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from aws_expect.exceptions import DynamoDBNonNumericFieldError, DynamoDBWaitTimeoutError
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource, Table
+    from mypy_boto3_dynamodb.type_defs import TableDescriptionTypeDef
 
 
 class DynamoDBItemExpectation:
@@ -13,7 +19,7 @@ class DynamoDBItemExpectation:
     provide built-in waiters for individual items.
     """
 
-    def __init__(self, table: Any) -> None:
+    def __init__(self, table: Table) -> None:
         self._table = table
         self._table_name: str = table.name
 
@@ -46,8 +52,8 @@ class DynamoDBItemExpectation:
         deadline = time.monotonic() + timeout
 
         while True:
-            response: dict[str, Any] = self._table.get_item(Key=key)
-            item: dict[str, Any] | None = response.get("Item")
+            response = self._table.get_item(Key=key)
+            item = response.get("Item")
             if item is not None:
                 if entries is None or self._matches_entries(item, entries):
                     return item
@@ -102,7 +108,7 @@ class DynamoDBItemExpectation:
         )
 
         while True:
-            response: dict[str, Any] = self._table.get_item(Key=key)
+            response = self._table.get_item(Key=key)
             if (item := response.get("Item")) is not None:
                 if (value := item.get(field)) is not None:
                     if not isinstance(value, (int, float, Decimal)):
@@ -143,7 +149,7 @@ class DynamoDBItemExpectation:
         deadline = time.monotonic() + timeout
 
         while True:
-            response: dict[str, Any] = self._table.scan(
+            response = self._table.scan(
                 Select="COUNT",
                 Limit=1,
             )
@@ -187,7 +193,7 @@ class DynamoDBItemExpectation:
         deadline = time.monotonic() + timeout
 
         while True:
-            response: dict[str, Any] = self._table.scan(
+            response = self._table.scan(
                 Select="COUNT",
                 Limit=1,
             )
@@ -229,8 +235,8 @@ class DynamoDBItemExpectation:
         deadline = time.monotonic() + timeout
 
         while True:
-            response: dict[str, Any] = self._table.get_item(Key=key)
-            item: dict[str, Any] | None = response.get("Item")
+            response = self._table.get_item(Key=key)
+            item = response.get("Item")
             if item is None:
                 return None
             remaining = deadline - time.monotonic()
@@ -260,7 +266,9 @@ class DynamoDBTableExpectation:
     Uses ``describe_table`` to poll for table existence and status.
     """
 
-    def __init__(self, dynamodb_resource: Any, table_name: str) -> None:
+    def __init__(
+        self, dynamodb_resource: DynamoDBServiceResource, table_name: str
+    ) -> None:
         self._resource = dynamodb_resource
         self._client = dynamodb_resource.meta.client
         self._table_name = table_name
@@ -269,7 +277,7 @@ class DynamoDBTableExpectation:
         self,
         timeout: float = 30,
         poll_interval: float = 5,
-    ) -> dict[str, Any]:
+    ) -> TableDescriptionTypeDef:
         """Poll ``describe_table`` until the table exists and is ACTIVE.
 
         Args:
@@ -289,10 +297,10 @@ class DynamoDBTableExpectation:
 
         while True:
             try:
-                response: dict[str, Any] = self._client.describe_table(
+                response = self._client.describe_table(
                     TableName=self._table_name,
                 )
-                table_desc: dict[str, Any] = response["Table"]
+                table_desc = response["Table"]
                 if table_desc.get("TableStatus") == "ACTIVE":
                     return table_desc
             except self._client.exceptions.ResourceNotFoundException:
