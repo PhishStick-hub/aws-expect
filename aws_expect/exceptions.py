@@ -107,6 +107,30 @@ class LambdaWaitTimeoutError(WaitTimeoutError):
         )
 
 
+class LambdaResponseMismatchError(Exception):
+    """Raised when a Lambda invocation response does not match expectations.
+
+    Unlike :class:`LambdaWaitTimeoutError`, this is not a polling timeout —
+    it signals that the single invocation returned an unexpected response.
+
+    Attributes:
+        function_name: Name or ARN of the Lambda function that was invoked.
+        payload: The full parsed response payload that was returned.
+    """
+
+    def __init__(
+        self,
+        function_name: str,
+        payload: dict[str, Any],
+    ) -> None:
+        self.function_name = function_name
+        self.payload = payload
+        super().__init__(
+            f"Lambda function {function_name!r} response did not match expectations:"
+            f" got {payload!r}"
+        )
+
+
 class SQSWaitTimeoutError(WaitTimeoutError):
     """Raised when an SQS wait operation exceeds the specified timeout."""
 
