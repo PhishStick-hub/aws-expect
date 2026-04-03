@@ -1,9 +1,18 @@
-name: PR Checks
+name: CI Pipeline
 
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
+        default: ''
+      run-build:
+        description: 'Whether to run the build job'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   quality-checks:
@@ -12,6 +21,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -41,6 +52,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -60,11 +73,14 @@ jobs:
 
   build:
     name: Build Package
+    if: ${{ inputs.run-build }}
     runs-on: ubuntu-latest
     needs: [quality-checks, test]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
