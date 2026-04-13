@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import math
 import time
-from typing import TYPE_CHECKING, Any, Generator
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 from aws_expect.exceptions import (
     SQSEventWaitTimeoutError,
@@ -31,7 +32,7 @@ class SQSQueueExpectation:
         timeout: float,
         poll_interval: float,
         visibility_timeout: int,
-    ) -> Generator[list[MessageTypeDef], None, None]:
+    ) -> Iterator[list[MessageTypeDef]]:
         """Yield batches of messages from the queue until timeout.
 
         Handles the polling loop: delay computation, deadline tracking,

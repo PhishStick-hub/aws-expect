@@ -11,7 +11,7 @@ from aws_expect.exceptions import S3WaitTimeoutError
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.service_resource import Object as S3Object
-    from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef
+    from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef, WaiterConfigTypeDef
 
 
 class S3ObjectExpectation:
@@ -137,7 +137,9 @@ class S3ObjectExpectation:
         return None
 
     @staticmethod
-    def _build_waiter_config(timeout: float, poll_interval: float) -> dict[str, int]:
+    def _build_waiter_config(
+        timeout: float, poll_interval: float
+    ) -> WaiterConfigTypeDef:
         """Convert timeout/poll_interval into a botocore WaiterConfig dict.
 
         Botocore expects ``Delay`` as an integer (seconds), so we clamp

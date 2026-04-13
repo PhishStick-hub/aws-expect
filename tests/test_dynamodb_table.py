@@ -4,11 +4,7 @@ from uuid import uuid4
 import pytest
 from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource, Table
 
-from aws_expect import (
-    DynamoDBWaitTimeoutError,
-    WaitTimeoutError,
-    expect_dynamodb_table,
-)
+from aws_expect import DynamoDBWaitTimeoutError, WaitTimeoutError, expect_dynamodb_table
 
 
 class TestDynamoDBTableToExist:
