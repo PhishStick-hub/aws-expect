@@ -23,7 +23,7 @@ def _send_event(queue: Queue, event: dict[str, Any]) -> None:
 class TestSQSToHaveEvent:
     """Tests for expect_sqs(queue).to_have_event(event=...)."""
 
-    def test_returns_message_on_exact_match(self, sqs_queue):
+    def test_returns_message_on_exact_match(self, sqs_queue: Queue) -> None:
         _send_event(sqs_queue, {"source": "my-app", "detail-type": "OrderPlaced"})
 
         result = expect_sqs(sqs_queue).to_have_event(
@@ -39,7 +39,7 @@ class TestSQSToHaveEvent:
         assert "MessageId" in result
         assert "ReceiptHandle" in result
 
-    def test_returns_message_on_subset_match(self, sqs_queue):
+    def test_returns_message_on_subset_match(self, sqs_queue: Queue) -> None:
         """Extra fields in the body are ignored."""
         _send_event(
             sqs_queue,
@@ -54,7 +54,7 @@ class TestSQSToHaveEvent:
 
         assert json.loads(result["Body"])["source"] == "my-app"
 
-    def test_deep_nested_match(self, sqs_queue):
+    def test_deep_nested_match(self, sqs_queue: Queue) -> None:
         _send_event(
             sqs_queue,
             {"source": "my-app", "detail": {"orderId": "123", "status": "placed"}},
@@ -68,7 +68,7 @@ class TestSQSToHaveEvent:
 
         assert json.loads(result["Body"])["detail"]["orderId"] == "123"
 
-    def test_non_json_body_skipped_polling_continues(self, sqs_queue):
+    def test_non_json_body_skipped_polling_continues(self, sqs_queue: Queue) -> None:
         """Non-JSON body is ignored; polling continues until a matching JSON message arrives."""
         sqs_queue.send_message(MessageBody="not-json")
 
@@ -87,7 +87,7 @@ class TestSQSToHaveEvent:
         finally:
             timer.cancel()
 
-    def test_raises_timeout_when_queue_empty(self, sqs_queue):
+    def test_raises_timeout_when_queue_empty(self, sqs_queue: Queue) -> None:
         with pytest.raises(SQSEventWaitTimeoutError) as exc_info:
             expect_sqs(sqs_queue).to_have_event(
                 event={"source": "my-app"},
@@ -99,7 +99,7 @@ class TestSQSToHaveEvent:
         assert exc_info.value.timeout == 2
         assert exc_info.value.queue_url == sqs_queue.url
 
-    def test_raises_timeout_when_wrong_event_present(self, sqs_queue):
+    def test_raises_timeout_when_wrong_event_present(self, sqs_queue: Queue) -> None:
         _send_event(sqs_queue, {"source": "other-app"})
 
         with pytest.raises(SQSEventWaitTimeoutError):
@@ -109,7 +109,9 @@ class TestSQSToHaveEvent:
                 poll_interval=1,
             )
 
-    def test_exception_chain_cause_is_sqs_wait_timeout_error(self, sqs_queue):
+    def test_exception_chain_cause_is_sqs_wait_timeout_error(
+        self, sqs_queue: Queue
+    ) -> None:
         """__cause__ must be SQSWaitTimeoutError to preserve exception chain."""
         with pytest.raises(SQSEventWaitTimeoutError) as exc_info:
             expect_sqs(sqs_queue).to_have_event(
@@ -120,7 +122,7 @@ class TestSQSToHaveEvent:
 
         assert isinstance(exc_info.value.__cause__, SQSWaitTimeoutError)
 
-    def test_non_matching_messages_remain_visible(self, sqs_queue):
+    def test_non_matching_messages_remain_visible(self, sqs_queue: Queue) -> None:
         """Non-destructive: message stays visible after a failed poll."""
         _send_event(sqs_queue, {"source": "other-app"})
 
@@ -136,7 +138,7 @@ class TestSQSToHaveEvent:
         assert json.loads(messages[0].body)["source"] == "other-app"
         messages[0].delete()
 
-    def test_succeeds_when_event_appears_mid_poll(self, sqs_queue):
+    def test_succeeds_when_event_appears_mid_poll(self, sqs_queue: Queue) -> None:
         def send_later() -> None:
             _send_event(sqs_queue, {"source": "my-app", "detail": {"id": "42"}})
 
@@ -152,7 +154,7 @@ class TestSQSToHaveEvent:
         finally:
             timer.cancel()
 
-    def test_catchable_as_wait_timeout_error(self, sqs_queue):
+    def test_catchable_as_wait_timeout_error(self, sqs_queue: Queue) -> None:
         with pytest.raises(WaitTimeoutError):
             expect_sqs(sqs_queue).to_have_event(
                 event={"source": "my-app"},
@@ -160,7 +162,7 @@ class TestSQSToHaveEvent:
                 poll_interval=1,
             )
 
-    def test_not_catchable_as_sqs_wait_timeout_error(self, sqs_queue):
+    def test_not_catchable_as_sqs_wait_timeout_error(self, sqs_queue: Queue) -> None:
         """SQSEventWaitTimeoutError does NOT inherit SQSWaitTimeoutError."""
         with pytest.raises(SQSEventWaitTimeoutError):
             expect_sqs(sqs_queue).to_have_event(
@@ -176,7 +178,7 @@ class TestSQSToHaveEvent:
 class TestSQSToConsumeEvent:
     """Tests for expect_sqs(queue).to_consume_event(event=...)."""
 
-    def test_returns_and_deletes_matching_message(self, sqs_queue):
+    def test_returns_and_deletes_matching_message(self, sqs_queue: Queue) -> None:
         _send_event(sqs_queue, {"source": "my-app"})
 
         result = expect_sqs(sqs_queue).to_consume_event(
@@ -189,7 +191,7 @@ class TestSQSToConsumeEvent:
         messages = sqs_queue.receive_messages(MaxNumberOfMessages=1)
         assert messages == []
 
-    def test_non_matched_in_match_batch_restored(self, sqs_queue):
+    def test_non_matched_in_match_batch_restored(self, sqs_queue: Queue) -> None:
         """Non-matching messages in same batch as match are restored."""
         _send_event(sqs_queue, {"source": "keep-me"})
         _send_event(sqs_queue, {"source": "delete-me"})
@@ -209,7 +211,7 @@ class TestSQSToConsumeEvent:
         for m in messages:
             m.delete()
 
-    def test_non_matched_in_no_match_batch_restored(self, sqs_queue):
+    def test_non_matched_in_no_match_batch_restored(self, sqs_queue: Queue) -> None:
         """Non-matching messages in a no-match batch are restored so polling can continue."""
         _send_event(sqs_queue, {"source": "keep-me"})
 
@@ -235,7 +237,7 @@ class TestSQSToConsumeEvent:
         for m in messages:
             m.delete()
 
-    def test_raises_timeout_when_queue_empty(self, sqs_queue):
+    def test_raises_timeout_when_queue_empty(self, sqs_queue: Queue) -> None:
         with pytest.raises(SQSEventWaitTimeoutError) as exc_info:
             expect_sqs(sqs_queue).to_consume_event(
                 event={"source": "my-app"},
@@ -246,7 +248,7 @@ class TestSQSToConsumeEvent:
         assert exc_info.value.event == {"source": "my-app"}
         assert exc_info.value.timeout == 2
 
-    def test_succeeds_when_event_appears_mid_poll(self, sqs_queue):
+    def test_succeeds_when_event_appears_mid_poll(self, sqs_queue: Queue) -> None:
         def send_later() -> None:
             _send_event(sqs_queue, {"source": "my-app"})
 
@@ -266,13 +268,15 @@ class TestSQSToConsumeEvent:
 class TestSQSToNotHaveEvent:
     """Tests for expect_sqs(queue).to_not_have_event(event=...)."""
 
-    def test_returns_none_when_queue_empty(self, sqs_queue):
+    def test_returns_none_when_queue_empty(self, sqs_queue: Queue) -> None:
         result = expect_sqs(sqs_queue).to_not_have_event(
             event={"source": "my-app"}, delay=1
         )
         assert result is None
 
-    def test_returns_none_when_non_matching_event_present(self, sqs_queue):
+    def test_returns_none_when_non_matching_event_present(
+        self, sqs_queue: Queue
+    ) -> None:
         _send_event(sqs_queue, {"source": "other-app"})
 
         result = expect_sqs(sqs_queue).to_not_have_event(
@@ -282,7 +286,7 @@ class TestSQSToNotHaveEvent:
 
         sqs_queue.receive_messages(MaxNumberOfMessages=1)[0].delete()
 
-    def test_raises_when_matching_event_found(self, sqs_queue):
+    def test_raises_when_matching_event_found(self, sqs_queue: Queue) -> None:
         _send_event(sqs_queue, {"source": "bad-app", "detail-type": "Alert"})
 
         with pytest.raises(SQSUnexpectedEventError) as exc_info:
@@ -295,7 +299,7 @@ class TestSQSToNotHaveEvent:
         assert exc_info.value.delay == 1
         assert exc_info.value.queue_url == sqs_queue.url
 
-    def test_not_a_wait_timeout_error(self, sqs_queue):
+    def test_not_a_wait_timeout_error(self, sqs_queue: Queue) -> None:
         _send_event(sqs_queue, {"source": "bad-app"})
 
         with pytest.raises(SQSUnexpectedEventError) as exc_info:
@@ -305,7 +309,7 @@ class TestSQSToNotHaveEvent:
 
         assert not isinstance(exc_info.value, WaitTimeoutError)
 
-    def test_delay_zero_clamped_to_one_second(self, sqs_queue):
+    def test_delay_zero_clamped_to_one_second(self, sqs_queue: Queue) -> None:
         """delay=0 must still wait at least 1 second (_compute_delay clamps it)."""
         start = time.monotonic()
         expect_sqs(sqs_queue).to_not_have_event(event={"source": "x"}, delay=0)

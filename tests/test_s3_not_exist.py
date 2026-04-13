@@ -1,6 +1,7 @@
 import threading
 
 import pytest
+from mypy_boto3_s3.service_resource import S3ServiceResource
 
 from aws_expect import S3WaitTimeoutError, expect_s3
 
@@ -8,7 +9,9 @@ from aws_expect import S3WaitTimeoutError, expect_s3
 class TestToNotExist:
     """Tests for expect_s3(s3_object).to_not_exist()."""
 
-    def test_returns_none_when_object_absent(self, s3_resource, test_bucket):
+    def test_returns_none_when_object_absent(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "ghost.txt"
 
         obj = s3_resource.Object(test_bucket, key)
@@ -16,7 +19,9 @@ class TestToNotExist:
 
         assert result is None
 
-    def test_raises_timeout_when_object_still_exists(self, s3_resource, test_bucket):
+    def test_raises_timeout_when_object_still_exists(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "persistent.txt"
         s3_resource.Object(test_bucket, key).put(Body=b"still here")
 
@@ -28,11 +33,13 @@ class TestToNotExist:
         assert exc_info.value.key == key
         assert exc_info.value.timeout == 2
 
-    def test_succeeds_when_object_deleted_mid_poll(self, s3_resource, test_bucket):
+    def test_succeeds_when_object_deleted_mid_poll(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "temporary.txt"
         s3_resource.Object(test_bucket, key).put(Body=b"going away")
 
-        def delete_later():
+        def delete_later() -> None:
             s3_resource.Object(test_bucket, key).delete()
 
         timer = threading.Timer(2.0, delete_later)

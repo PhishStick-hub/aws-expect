@@ -2,6 +2,7 @@ import json
 import threading
 
 import pytest
+from mypy_boto3_s3.service_resource import S3ServiceResource
 
 from aws_expect import S3WaitTimeoutError, expect_s3
 
@@ -9,7 +10,9 @@ from aws_expect import S3WaitTimeoutError, expect_s3
 class TestToExist:
     """Tests for expect_s3(s3_object).to_exist()."""
 
-    def test_returns_metadata_when_object_exists(self, s3_resource, test_bucket):
+    def test_returns_metadata_when_object_exists(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "hello.txt"
         s3_resource.Object(test_bucket, key).put(Body=b"hello world")
 
@@ -21,7 +24,9 @@ class TestToExist:
         assert "LastModified" in result
         assert "ContentType" in result
 
-    def test_raises_timeout_when_object_missing(self, s3_resource, test_bucket):
+    def test_raises_timeout_when_object_missing(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "does-not-exist.txt"
 
         obj = s3_resource.Object(test_bucket, key)
@@ -32,10 +37,12 @@ class TestToExist:
         assert exc_info.value.key == key
         assert exc_info.value.timeout == 2
 
-    def test_succeeds_when_object_appears_mid_poll(self, s3_resource, test_bucket):
+    def test_succeeds_when_object_appears_mid_poll(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "delayed.txt"
 
-        def upload_later():
+        def upload_later() -> None:
             s3_resource.Object(test_bucket, key).put(Body=b"arrived")
 
         timer = threading.Timer(2.0, upload_later)
@@ -48,7 +55,9 @@ class TestToExist:
         finally:
             timer.cancel()
 
-    def test_returns_correct_metadata_for_content_type(self, s3_resource, test_bucket):
+    def test_returns_correct_metadata_for_content_type(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "data.json"
         s3_resource.Object(test_bucket, key).put(
             Body=b'{"a": 1}', ContentType="application/json"
@@ -59,7 +68,9 @@ class TestToExist:
 
         assert result["ContentType"] == "application/json"
 
-    def test_matches_expected_entries(self, s3_resource, test_bucket):
+    def test_matches_expected_entries(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "order.json"
         s3_resource.Object(test_bucket, key).put(
             Body=json.dumps({"status": "active", "total": 100}).encode()
@@ -75,7 +86,9 @@ class TestToExist:
         assert result["status"] == "active"
         assert result["total"] == 100  # extra fields are present
 
-    def test_raises_timeout_when_entries_dont_match(self, s3_resource, test_bucket):
+    def test_raises_timeout_when_entries_dont_match(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "order.json"
         s3_resource.Object(test_bucket, key).put(
             Body=json.dumps({"status": "pending"}).encode()
@@ -89,13 +102,15 @@ class TestToExist:
                 poll_interval=1,
             )
 
-    def test_succeeds_when_entries_match_after_update(self, s3_resource, test_bucket):
+    def test_succeeds_when_entries_match_after_update(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
         key = "order.json"
         s3_resource.Object(test_bucket, key).put(
             Body=json.dumps({"status": "pending"}).encode()
         )
 
-        def update_later():
+        def update_later() -> None:
             s3_resource.Object(test_bucket, key).put(
                 Body=json.dumps({"status": "shipped"}).encode()
             )

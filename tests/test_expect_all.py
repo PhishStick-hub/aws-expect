@@ -3,6 +3,7 @@ import time
 from typing import Any
 
 import pytest
+from mypy_boto3_dynamodb.service_resource import Table
 
 from aws_expect import (
     AggregateWaitTimeoutError,
@@ -15,7 +16,7 @@ from aws_expect import (
 class TestExpectAllSuccess:
     """Tests for expect_all when all expectations succeed."""
 
-    def test_returns_all_results_in_order(self, dynamodb_tables):
+    def test_returns_all_results_in_order(self, dynamodb_tables: list[Table]) -> None:
         tables = dynamodb_tables
         tables[0].put_item(Item={"pk": "a", "val": "first"})
         tables[1].put_item(Item={"pk": "b", "val": "second"})
@@ -40,12 +41,14 @@ class TestExpectAllSuccess:
         assert results[1]["val"] == "second"
         assert results[2]["val"] == "third"
 
-    def test_runs_in_parallel_not_sequentially(self, dynamodb_tables):
+    def test_runs_in_parallel_not_sequentially(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
         """Wall-clock time should be ~max(delays), not sum(delays)."""
         tables = dynamodb_tables
 
-        def insert_later(table, key, delay):
-            def _insert():
+        def insert_later(table: Table, key: str, delay: float) -> threading.Timer:
+            def _insert() -> None:
                 table.put_item(Item={"pk": key, "ready": True})
 
             timer = threading.Timer(delay, _insert)
@@ -84,7 +87,7 @@ class TestExpectAllSuccess:
             for t in timers:
                 t.cancel()
 
-    def test_works_with_single_expectation(self, dynamodb_table):
+    def test_works_with_single_expectation(self, dynamodb_table: Table) -> None:
         dynamodb_table.put_item(Item={"pk": "solo", "val": "only"})
 
         results = expect_all(
@@ -98,7 +101,7 @@ class TestExpectAllSuccess:
         assert len(results) == 1
         assert results[0]["val"] == "only"
 
-    def test_empty_list_returns_empty_list(self):
+    def test_empty_list_returns_empty_list(self) -> None:
         results = expect_all([])
 
         assert results == []
@@ -107,7 +110,9 @@ class TestExpectAllSuccess:
 class TestExpectAllFailure:
     """Tests for expect_all when one or more expectations fail."""
 
-    def test_raises_aggregate_error_when_one_fails(self, dynamodb_tables):
+    def test_raises_aggregate_error_when_one_fails(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
         tables = dynamodb_tables
         tables[0].put_item(Item={"pk": "ok-1", "val": "good"})
         tables[1].put_item(Item={"pk": "ok-2", "val": "fine"})
@@ -139,7 +144,9 @@ class TestExpectAllFailure:
         # Failed result is None
         assert err.results[2] is None
 
-    def test_raises_aggregate_error_when_all_fail(self, dynamodb_tables):
+    def test_raises_aggregate_error_when_all_fail(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
         tables = dynamodb_tables
 
         with pytest.raises(AggregateWaitTimeoutError) as exc_info:
@@ -161,7 +168,9 @@ class TestExpectAllFailure:
         assert len(err.errors) == 3
         assert all(r is None for r in err.results)
 
-    def test_aggregate_error_is_catchable_as_wait_timeout_error(self, dynamodb_table):
+    def test_aggregate_error_is_catchable_as_wait_timeout_error(
+        self, dynamodb_table: Table
+    ) -> None:
         """AggregateWaitTimeoutError is a WaitTimeoutError."""
         with pytest.raises(WaitTimeoutError):
             expect_all(
@@ -172,7 +181,9 @@ class TestExpectAllFailure:
                 ]
             )
 
-    def test_aggregate_error_contains_individual_errors(self, dynamodb_tables):
+    def test_aggregate_error_contains_individual_errors(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
         tables = dynamodb_tables
 
         with pytest.raises(AggregateWaitTimeoutError) as exc_info:
@@ -192,17 +203,19 @@ class TestExpectAllFailure:
         assert all(isinstance(e, WaitTimeoutError) for e in err.errors)
         assert err.timeout == 3  # max of individual timeouts
 
-    def test_non_wait_timeout_error_propagates(self):
+    def test_non_wait_timeout_error_propagates(self) -> None:
         """Non-WaitTimeoutError exceptions are re-raised directly."""
 
-        def boom():
+        def boom() -> None:
             msg = "unexpected failure"
             raise RuntimeError(msg)
 
         with pytest.raises(RuntimeError, match="unexpected failure"):
             expect_all([boom])
 
-    def test_aggregate_error_message_is_descriptive(self, dynamodb_tables):
+    def test_aggregate_error_message_is_descriptive(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
         tables = dynamodb_tables
 
         with pytest.raises(AggregateWaitTimeoutError, match=r"1 of 2.*timed out"):
