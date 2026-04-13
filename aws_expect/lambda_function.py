@@ -13,7 +13,10 @@ from aws_expect.exceptions import LambdaResponseMismatchError, LambdaWaitTimeout
 
 if TYPE_CHECKING:
     from mypy_boto3_lambda.client import LambdaClient
-    from mypy_boto3_lambda.type_defs import GetFunctionResponseTypeDef
+    from mypy_boto3_lambda.type_defs import (
+        GetFunctionResponseTypeDef,
+        WaiterConfigTypeDef,
+    )
 
 
 class LambdaFunctionExpectation:
@@ -253,7 +256,9 @@ class LambdaFunctionExpectation:
         return response_payload
 
     @staticmethod
-    def _build_waiter_config(timeout: float, poll_interval: float) -> dict[str, int]:
+    def _build_waiter_config(
+        timeout: float, poll_interval: float
+    ) -> WaiterConfigTypeDef:
         """Convert timeout/poll_interval into a botocore WaiterConfig dict."""
         delay = max(1, math.ceil(poll_interval))
         max_attempts = max(1, math.ceil(timeout / delay))

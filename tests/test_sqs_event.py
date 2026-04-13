@@ -1,8 +1,10 @@
 import json
 import threading
 import time
+from typing import Any
 
 import pytest
+from mypy_boto3_sqs.service_resource import Queue
 
 from aws_expect import (
     SQSEventWaitTimeoutError,
@@ -13,7 +15,7 @@ from aws_expect import (
 )
 
 
-def _send_event(queue, event: dict) -> None:
+def _send_event(queue: Queue, event: dict[str, Any]) -> None:
     """Helper: send a JSON-serialised event to the queue."""
     queue.send_message(MessageBody=json.dumps(event))
 

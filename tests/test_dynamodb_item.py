@@ -1,8 +1,8 @@
 import threading
 from decimal import Decimal
-from typing import Any
 
 import pytest
+from mypy_boto3_dynamodb.service_resource import Table
 
 from aws_expect import (
     DynamoDBNonNumericFieldError,
@@ -231,7 +231,9 @@ class TestDynamoDBToBeNotEmpty:
 class TestDynamoDBToHaveNumericValueCloseTo:
     """Tests for expect_dynamodb_item(table).to_have_numeric_value_close_to(...)."""
 
-    def test_returns_item_when_value_matches_exactly(self, dynamodb_table: Any) -> None:
+    def test_returns_item_when_value_matches_exactly(
+        self, dynamodb_table: Table
+    ) -> None:
         dynamodb_table.put_item(Item={"pk": "item-1", "score": 42})
 
         result = expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
@@ -246,7 +248,7 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         assert result["pk"] == "item-1"
         assert result["score"] == 42
 
-    def test_returns_item_when_value_within_delta(self, dynamodb_table: Any) -> None:
+    def test_returns_item_when_value_within_delta(self, dynamodb_table: Table) -> None:
         dynamodb_table.put_item(Item={"pk": "item-2", "temperature": Decimal("98.9")})
 
         result = expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
@@ -260,7 +262,9 @@ class TestDynamoDBToHaveNumericValueCloseTo:
 
         assert result["pk"] == "item-2"
 
-    def test_raises_timeout_when_value_out_of_delta(self, dynamodb_table: Any) -> None:
+    def test_raises_timeout_when_value_out_of_delta(
+        self, dynamodb_table: Table
+    ) -> None:
         dynamodb_table.put_item(Item={"pk": "item-3", "score": 50})
 
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
@@ -278,7 +282,7 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         assert exc_info.value.timeout == 2
 
     def test_raises_immediately_when_field_not_numeric(
-        self, dynamodb_table: Any
+        self, dynamodb_table: Table
     ) -> None:
         dynamodb_table.put_item(Item={"pk": "item-4", "score": "not-a-number"})
 
@@ -297,7 +301,7 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         assert exc_info.value.field == "score"
         assert exc_info.value.value == "not-a-number"
 
-    def test_raises_timeout_when_item_missing(self, dynamodb_table: Any) -> None:
+    def test_raises_timeout_when_item_missing(self, dynamodb_table: Table) -> None:
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
             expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
                 key={"pk": "ghost"},
@@ -312,7 +316,7 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         assert exc_info.value.key == {"pk": "ghost"}
         assert exc_info.value.timeout == 2
 
-    def test_raises_timeout_when_field_absent(self, dynamodb_table: Any) -> None:
+    def test_raises_timeout_when_field_absent(self, dynamodb_table: Table) -> None:
         dynamodb_table.put_item(Item={"pk": "item-5", "other": "value"})
 
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
@@ -327,7 +331,7 @@ class TestDynamoDBToHaveNumericValueCloseTo:
 
         assert exc_info.value.table_name == dynamodb_table.name
 
-    def test_catchable_as_base_wait_timeout_error(self, dynamodb_table: Any) -> None:
+    def test_catchable_as_base_wait_timeout_error(self, dynamodb_table: Table) -> None:
         """DynamoDBWaitTimeoutError is a WaitTimeoutError."""
         with pytest.raises(WaitTimeoutError):
             expect_dynamodb_item(dynamodb_table).to_have_numeric_value_close_to(
@@ -339,7 +343,9 @@ class TestDynamoDBToHaveNumericValueCloseTo:
                 poll_interval=1,
             )
 
-    def test_succeeds_when_value_converges_mid_poll(self, dynamodb_table: Any) -> None:
+    def test_succeeds_when_value_converges_mid_poll(
+        self, dynamodb_table: Table
+    ) -> None:
         dynamodb_table.put_item(Item={"pk": "item-6", "score": 1})
 
         def update_later() -> None:
@@ -368,7 +374,7 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         finally:
             timer.cancel()
 
-    def test_works_with_composite_key(self, dynamodb_composite_table: Any) -> None:
+    def test_works_with_composite_key(self, dynamodb_composite_table: Table) -> None:
         dynamodb_composite_table.put_item(
             Item={"pk": "user-1", "sk": "order-1", "amount": Decimal("99.5")}
         )
