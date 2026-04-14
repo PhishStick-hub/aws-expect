@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import math
 import time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from aws_expect._utils import _compute_delay, _matches_entries
 from aws_expect.exceptions import DynamoDBNonNumericFieldError, DynamoDBWaitTimeoutError
 
 if TYPE_CHECKING:
@@ -48,14 +48,14 @@ class DynamoDBItemExpectation:
             DynamoDBWaitTimeoutError: If the item does not exist or does
                 not match *entries* within *timeout*.
         """
-        delay = self._compute_delay(poll_interval)
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
             response = self._table.get_item(Key=key)
             item = response.get("Item")
             if item is not None:
-                if entries is None or self._matches_entries(item, entries):
+                if entries is None or _matches_entries(item, entries):
                     return item
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -100,7 +100,7 @@ class DynamoDBItemExpectation:
                 non-numeric value; after *timeout* if the item does not exist,
                 *field* is absent, or the value does not converge within *delta*.
         """
-        delay = self._compute_delay(poll_interval)
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
         timeout_message = (
             f"Timed out after {timeout}s waiting for item {key} field '{field}'"
@@ -145,7 +145,7 @@ class DynamoDBItemExpectation:
             DynamoDBWaitTimeoutError: If the table still contains items
                 after *timeout*.
         """
-        delay = self._compute_delay(poll_interval)
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -189,7 +189,7 @@ class DynamoDBItemExpectation:
             DynamoDBWaitTimeoutError: If the table is still empty after
                 *timeout*.
         """
-        delay = self._compute_delay(poll_interval)
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -231,7 +231,7 @@ class DynamoDBItemExpectation:
         Raises:
             DynamoDBWaitTimeoutError: If the item still exists after *timeout*.
         """
-        delay = self._compute_delay(poll_interval)
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -243,16 +243,6 @@ class DynamoDBItemExpectation:
             if remaining <= 0:
                 raise DynamoDBWaitTimeoutError(self._table_name, key, timeout)
             time.sleep(min(delay, remaining))
-
-    @staticmethod
-    def _compute_delay(poll_interval: float) -> int:
-        """Clamp poll_interval to a minimum of 1 and round up."""
-        return max(1, math.ceil(poll_interval))
-
-    @staticmethod
-    def _matches_entries(item: dict[str, Any], entries: dict[str, Any]) -> bool:
-        """Check that *item* contains all expected *entries* (subset match)."""
-        return all(item.get(k) == v for k, v in entries.items())
 
     @staticmethod
     def _is_close(value: int | float | Decimal, expected: float, delta: float) -> bool:
@@ -292,7 +282,7 @@ class DynamoDBTableExpectation:
             DynamoDBWaitTimeoutError: If the table does not exist or does
                 not become ACTIVE within *timeout*.
         """
-        delay = self._compute_delay(poll_interval)
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -337,7 +327,7 @@ class DynamoDBTableExpectation:
             DynamoDBWaitTimeoutError: If the table still exists after
                 *timeout*.
         """
-        delay = self._compute_delay(poll_interval)
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -358,8 +348,3 @@ class DynamoDBTableExpectation:
                     ),
                 )
             time.sleep(min(delay, remaining))
-
-    @staticmethod
-    def _compute_delay(poll_interval: float) -> int:
-        """Clamp poll_interval to a minimum of 1 and round up."""
-        return max(1, math.ceil(poll_interval))

@@ -1,4 +1,5 @@
 import threading
+from contextlib import suppress
 from uuid import uuid4
 
 import pytest
@@ -70,11 +71,9 @@ class TestDynamoDBTableToExist:
             assert result["TableStatus"] == "ACTIVE"
         finally:
             timer.cancel()
-            # Cleanup: delete the table we created
-            try:
+            # Cleanup: delete the table we created (may already be gone if test failed)
+            with suppress(Exception):
                 dynamodb_resource.meta.client.delete_table(TableName=table_name)
-            except Exception:
-                pass
 
 
 class TestDynamoDBTableToNotExist:
@@ -142,7 +141,5 @@ class TestDynamoDBTableToNotExist:
         finally:
             timer.cancel()
             # Cleanup in case the test failed before deletion happened
-            try:
+            with suppress(Exception):
                 dynamodb_resource.meta.client.delete_table(TableName=table_name)
-            except Exception:
-                pass
