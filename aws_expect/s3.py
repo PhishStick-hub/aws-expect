@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 import json
-import math
 import time
 from typing import TYPE_CHECKING, Any, overload
 
 from botocore.exceptions import ClientError, WaiterError
 
+from aws_expect._utils import _build_waiter_config, _compute_delay, _matches_entries
 from aws_expect.exceptions import S3WaitTimeoutError
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.service_resource import Object as S3Object
-    from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef, WaiterConfigTypeDef
+    from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef
 
 
 class S3ObjectExpectation:
@@ -72,7 +72,7 @@ class S3ObjectExpectation:
         if entries is not None:
             return self._poll_for_entries(timeout, poll_interval, entries)
 
-        waiter_config = self._build_waiter_config(timeout, poll_interval)
+        waiter_config = _build_waiter_config(timeout, poll_interval)
         try:
             self._client.get_waiter("object_exists").wait(
                 Bucket=self._bucket,
@@ -90,14 +90,14 @@ class S3ObjectExpectation:
         entries: dict[str, Any],
     ) -> dict[str, Any]:
         """Poll ``get_object``, parse JSON, and wait for a subset match."""
-        delay = max(1, math.ceil(poll_interval))
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
             try:
                 response = self._client.get_object(Bucket=self._bucket, Key=self._key)
                 body = json.loads(response["Body"].read())
-                if isinstance(body, dict) and self._matches_entries(body, entries):
+                if isinstance(body, dict) and _matches_entries(body, entries):
                     return body
             except ClientError as err:
                 # Object does not exist yet – keep polling.
@@ -125,7 +125,7 @@ class S3ObjectExpectation:
         Raises:
             S3WaitTimeoutError: If the object still exists after *timeout*.
         """
-        waiter_config = self._build_waiter_config(timeout, poll_interval)
+        waiter_config = _build_waiter_config(timeout, poll_interval)
         try:
             self._client.get_waiter("object_not_exists").wait(
                 Bucket=self._bucket,
@@ -135,21 +135,3 @@ class S3ObjectExpectation:
         except WaiterError as exc:
             raise S3WaitTimeoutError(self._bucket, self._key, timeout) from exc
         return None
-
-    @staticmethod
-    def _build_waiter_config(
-        timeout: float, poll_interval: float
-    ) -> WaiterConfigTypeDef:
-        """Convert timeout/poll_interval into a botocore WaiterConfig dict.
-
-        Botocore expects ``Delay`` as an integer (seconds), so we clamp
-        to a minimum of 1 and round up.
-        """
-        delay = max(1, math.ceil(poll_interval))
-        max_attempts = max(1, math.ceil(timeout / delay))
-        return {"Delay": delay, "MaxAttempts": max_attempts}
-
-    @staticmethod
-    def _matches_entries(item: dict[str, Any], entries: dict[str, Any]) -> bool:
-        """Check that *item* contains all expected *entries* (subset match)."""
-        return all(item.get(k) == v for k, v in entries.items())

@@ -7,6 +7,7 @@ from mypy_boto3_dynamodb.service_resource import Table
 
 from aws_expect import (
     AggregateWaitTimeoutError,
+    DynamoDBNonNumericFieldError,
     WaitTimeoutError,
     expect_all,
     expect_dynamodb_item,
@@ -212,6 +213,37 @@ class TestExpectAllFailure:
 
         with pytest.raises(RuntimeError, match="unexpected failure"):
             expect_all([boom])
+
+    def test_non_numeric_field_error_propagates_immediately(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
+        """DynamoDBNonNumericFieldError must propagate immediately, not be aggregated.
+
+        Before the fix, DynamoDBNonNumericFieldError inherited WaitTimeoutError and
+        was silently swallowed into AggregateWaitTimeoutError. It must now surface
+        directly so callers know they have a type error, not a timing issue.
+        """
+        tables = dynamodb_tables
+        tables[0].put_item(Item={"pk": "bad", "score": "not-a-number"})
+
+        with pytest.raises(DynamoDBNonNumericFieldError):
+            expect_all(
+                [
+                    lambda: expect_dynamodb_item(
+                        tables[0]
+                    ).to_have_numeric_value_close_to(
+                        key={"pk": "bad"},
+                        field="score",
+                        expected=10,
+                        delta=1,
+                        timeout=10,
+                        poll_interval=1,
+                    ),
+                    lambda: expect_dynamodb_item(tables[1]).to_exist(
+                        key={"pk": "present"}, timeout=10, poll_interval=1
+                    ),
+                ]
+            )
 
     def test_aggregate_error_message_is_descriptive(
         self, dynamodb_tables: list[Table]

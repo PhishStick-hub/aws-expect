@@ -3,20 +3,17 @@
 from __future__ import annotations
 
 import json
-import math
 import time
 from typing import TYPE_CHECKING, Any
 
 from botocore.exceptions import ClientError, WaiterError
 
+from aws_expect._utils import _build_waiter_config, _compute_delay, _matches_entries
 from aws_expect.exceptions import LambdaResponseMismatchError, LambdaWaitTimeoutError
 
 if TYPE_CHECKING:
     from mypy_boto3_lambda.client import LambdaClient
-    from mypy_boto3_lambda.type_defs import (
-        GetFunctionResponseTypeDef,
-        WaiterConfigTypeDef,
-    )
+    from mypy_boto3_lambda.type_defs import GetFunctionResponseTypeDef
 
 
 class LambdaFunctionExpectation:
@@ -51,7 +48,7 @@ class LambdaFunctionExpectation:
         Raises:
             LambdaWaitTimeoutError: If the function does not exist within *timeout*.
         """
-        waiter_config = self._build_waiter_config(timeout, poll_interval)
+        waiter_config = _build_waiter_config(timeout, poll_interval)
         try:
             self._client.get_waiter("function_exists").wait(
                 FunctionName=function_name,
@@ -82,7 +79,7 @@ class LambdaFunctionExpectation:
         Raises:
             LambdaWaitTimeoutError: If the function still exists after *timeout*.
         """
-        delay = max(1, math.ceil(poll_interval))
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -121,7 +118,7 @@ class LambdaFunctionExpectation:
             LambdaWaitTimeoutError: If the function does not reach ``Active``
                 within *timeout*, or if it enters the ``Failed`` state.
         """
-        waiter_config = self._build_waiter_config(timeout, poll_interval)
+        waiter_config = _build_waiter_config(timeout, poll_interval)
         try:
             self._client.get_waiter("function_active_v2").wait(
                 FunctionName=function_name,
@@ -156,7 +153,7 @@ class LambdaFunctionExpectation:
             LambdaWaitTimeoutError: If the update does not complete within
                 *timeout*, or if ``LastUpdateStatus`` becomes ``Failed``.
         """
-        waiter_config = self._build_waiter_config(timeout, poll_interval)
+        waiter_config = _build_waiter_config(timeout, poll_interval)
         try:
             self._client.get_waiter("function_updated_v2").wait(
                 FunctionName=function_name,
@@ -195,7 +192,7 @@ class LambdaFunctionExpectation:
             LambdaWaitTimeoutError: If the function does not become invocable
                 (or does not match *entries*) within *timeout*.
         """
-        delay = max(1, math.ceil(poll_interval))
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         invoke_kwargs: dict[str, Any] = {"FunctionName": function_name}
@@ -208,7 +205,7 @@ class LambdaFunctionExpectation:
                 response_payload: dict[str, Any] = json.loads(
                     response["Payload"].read()
                 )
-                if entries is None or self._matches_entries(response_payload, entries):
+                if entries is None or _matches_entries(response_payload, entries):
                     return response_payload
 
             remaining = deadline - time.monotonic()
@@ -256,15 +253,6 @@ class LambdaFunctionExpectation:
         return response_payload
 
     @staticmethod
-    def _build_waiter_config(
-        timeout: float, poll_interval: float
-    ) -> WaiterConfigTypeDef:
-        """Convert timeout/poll_interval into a botocore WaiterConfig dict."""
-        delay = max(1, math.ceil(poll_interval))
-        max_attempts = max(1, math.ceil(timeout / delay))
-        return {"Delay": delay, "MaxAttempts": max_attempts}
-
-    @staticmethod
     def _matches_response(
         payload: dict[str, Any],
         status_code: int | None,
@@ -286,8 +274,3 @@ class LambdaFunctionExpectation:
             if not all(parsed_body.get(k) == v for k, v in body.items()):
                 return False
         return True
-
-    @staticmethod
-    def _matches_entries(data: dict[str, Any], entries: dict[str, Any]) -> bool:
-        """Check that *data* contains all expected *entries* (shallow subset match)."""
-        return all(data.get(k) == v for k, v in entries.items())

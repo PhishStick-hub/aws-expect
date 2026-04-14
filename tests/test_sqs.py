@@ -11,6 +11,9 @@ from aws_expect import (
     expect_sqs,
 )
 
+# LocalStack needs a short settle period after change_message_visibility calls.
+_LOCALSTACK_SETTLE_S = 1.0
+
 
 class TestSQSToHaveMessage:
     """Tests for expect_sqs(queue).to_have_message(body=...)."""
@@ -150,7 +153,9 @@ class TestSQSToConsumeMessage:
         assert result["Body"] == "delete-me"
 
         # Remaining messages must still be visible
-        time.sleep(1.0)  # allow change_message_visibility to propagate in LocalStack
+        time.sleep(
+            _LOCALSTACK_SETTLE_S
+        )  # allow change_message_visibility to propagate in LocalStack
         messages = sqs_queue.receive_messages(MaxNumberOfMessages=10)
         remaining_bodies = {m.body for m in messages}
         assert "delete-me" not in remaining_bodies

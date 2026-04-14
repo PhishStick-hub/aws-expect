@@ -14,6 +14,9 @@ from aws_expect import (
     expect_sqs,
 )
 
+# LocalStack needs a short settle period after change_message_visibility calls.
+_LOCALSTACK_SETTLE_S = 1.0
+
 
 def _send_event(queue: Queue, event: dict[str, Any]) -> None:
     """Helper: send a JSON-serialised event to the queue."""
@@ -203,7 +206,9 @@ class TestSQSToConsumeEvent:
         )
         assert json.loads(result["Body"])["source"] == "delete-me"
 
-        time.sleep(1.0)  # allow change_message_visibility to propagate in LocalStack
+        time.sleep(
+            _LOCALSTACK_SETTLE_S
+        )  # allow change_message_visibility to propagate in LocalStack
         messages = sqs_queue.receive_messages(MaxNumberOfMessages=10)
         bodies = [json.loads(m.body)["source"] for m in messages]
         assert "delete-me" not in bodies
@@ -230,7 +235,7 @@ class TestSQSToConsumeEvent:
         finally:
             timer.cancel()
 
-        time.sleep(1.0)
+        time.sleep(_LOCALSTACK_SETTLE_S)
         messages = sqs_queue.receive_messages(MaxNumberOfMessages=10)
         bodies = [json.loads(m.body)["source"] for m in messages]
         assert "keep-me" in bodies

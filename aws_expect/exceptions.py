@@ -52,7 +52,7 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         super().__init__(msg)
 
 
-class DynamoDBNonNumericFieldError(WaitTimeoutError):
+class DynamoDBNonNumericFieldError(Exception):
     """Raised immediately when a DynamoDB item field contains a non-numeric value.
 
     Unlike :class:`DynamoDBWaitTimeoutError`, this is not a polling timeout —

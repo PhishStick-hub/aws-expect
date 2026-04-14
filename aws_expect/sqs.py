@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import math
 import time
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
+from aws_expect._utils import _compute_delay
 from aws_expect.exceptions import (
     SQSEventWaitTimeoutError,
     SQSUnexpectedEventError,
@@ -51,7 +51,7 @@ class SQSQueueExpectation:
             SQSWaitTimeoutError: When the deadline passes without the caller
                 returning from the for loop.
         """
-        delay = self._compute_delay(poll_interval)
+        delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -179,7 +179,7 @@ class SQSQueueExpectation:
         Raises:
             SQSUnexpectedMessageError: If a message matching *body* is found.
         """
-        time.sleep(self._compute_delay(delay))
+        time.sleep(_compute_delay(delay))
         response = self._client.receive_message(
             QueueUrl=self._queue_url,
             MaxNumberOfMessages=10,
@@ -226,11 +226,6 @@ class SQSQueueExpectation:
         except (json.JSONDecodeError, ValueError):
             return False
         return isinstance(body, dict) and self._deep_matches(body, event)
-
-    @staticmethod
-    def _compute_delay(poll_interval: float) -> int:
-        """Clamp poll_interval to a minimum of 1 and round up."""
-        return max(1, math.ceil(poll_interval))
 
     @staticmethod
     def _deep_matches(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
@@ -366,7 +361,7 @@ class SQSQueueExpectation:
         Raises:
             SQSUnexpectedEventError: If a matching message is found.
         """
-        time.sleep(self._compute_delay(delay))
+        time.sleep(_compute_delay(delay))
         response = self._client.receive_message(
             QueueUrl=self._queue_url,
             MaxNumberOfMessages=10,
