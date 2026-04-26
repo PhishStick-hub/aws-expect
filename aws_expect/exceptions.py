@@ -28,6 +28,70 @@ class S3WaitTimeoutError(WaitTimeoutError):
         super().__init__(f"Timed out after {timeout}s waiting for s3://{bucket}/{key}")
 
 
+class S3ContentWaitTimeoutError(S3WaitTimeoutError):
+    """Raised when to_have_content times out without finding a matching body.
+
+    Inherits S3WaitTimeoutError so callers catching S3WaitTimeoutError or
+    WaitTimeoutError still catch it.
+
+    Attributes:
+        bucket: S3 bucket name.
+        key: S3 object key.
+        expected: The subset dict that was never matched.
+        actual: The last parsed JSON body seen during polling, or None if the
+            object was never readable as JSON.
+        timeout: The timeout that was configured for the wait operation.
+    """
+
+    def __init__(
+        self,
+        bucket: str,
+        key: str,
+        expected: dict[str, Any],
+        actual: dict[str, Any] | None,
+        timeout: float,
+    ) -> None:
+        self.bucket = bucket
+        self.key = key
+        self.expected = expected
+        self.actual = actual
+        self.timeout = timeout
+        WaitTimeoutError.__init__(
+            self,
+            f"Timed out after {timeout}s waiting for s3://{bucket}/{key}"
+            f" to have content matching expected={expected!r}; last body: {actual!r}",
+        )
+
+
+class S3UnexpectedContentError(Exception):
+    """Raised when to_not_have_content finds the object body matches entries.
+
+    Does NOT inherit WaitTimeoutError — mirrors SQSUnexpectedEventError.
+
+    Attributes:
+        bucket: S3 bucket name.
+        key: S3 object key.
+        entries: The subset dict that was unexpectedly found.
+        delay: The number of seconds waited before the check.
+    """
+
+    def __init__(
+        self,
+        bucket: str,
+        key: str,
+        entries: dict[str, Any],
+        delay: float,
+    ) -> None:
+        self.bucket = bucket
+        self.key = key
+        self.entries = entries
+        self.delay = delay
+        super().__init__(
+            f"Unexpected content matching {entries!r} found"
+            f" in s3://{bucket}/{key} after {delay}s delay"
+        )
+
+
 class DynamoDBWaitTimeoutError(WaitTimeoutError):
     """Raised when a DynamoDB wait operation exceeds the specified timeout."""
 
@@ -50,6 +114,76 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         else:
             msg = f"Timed out after {timeout}s waiting for item {key} in table {table_name}"
         super().__init__(msg)
+
+
+class DynamoDBFindItemTimeoutError(DynamoDBWaitTimeoutError):
+    """Raised when to_find_item times out without finding a matching item.
+
+    Inherits DynamoDBWaitTimeoutError so callers catching DynamoDBWaitTimeoutError
+    or WaitTimeoutError still catch it.
+
+    Attributes:
+        table_name: Name of the DynamoDB table that was scanned.
+        expected: The subset dict that was never matched.
+        actual: All items seen in the last complete scan pass, or None if no
+            pass completed before timeout (table always empty or first poll
+            timed out mid-scan).
+        timeout: The timeout that was configured for the wait operation.
+    """
+
+    def __init__(
+        self,
+        table_name: str,
+        expected: dict[str, Any],
+        actual: list[dict[str, Any]] | None,
+        timeout: float,
+    ) -> None:
+        self.table_name = table_name
+        self.expected = expected
+        self.actual = actual
+        self.timeout = timeout
+        # Initialise parent-class attributes that DynamoDBWaitTimeoutError.__init__
+        # would set, so that callers catching as DynamoDBWaitTimeoutError can
+        # safely access .key and .entries without AttributeError.
+        self.key = None
+        self.entries = None
+        item_count = len(actual) if actual is not None else 0
+        WaitTimeoutError.__init__(
+            self,
+            f"Timed out after {timeout}s waiting for an item matching {expected!r}"
+            f" in table {table_name};"
+            f" last scan returned {item_count} item(s): {actual!r}",
+        )
+
+
+class DynamoDBUnexpectedItemError(Exception):
+    """Raised when to_not_find_item finds a matching item in the table.
+
+    Does NOT inherit WaitTimeoutError — mirrors S3UnexpectedContentError,
+    SQSUnexpectedMessageError, and SQSUnexpectedEventError.
+
+    Attributes:
+        table_name: Name of the DynamoDB table that was scanned.
+        entries: The subset dict that was unexpectedly found.
+        found_item: The full item dict that matched entries.
+        delay: The number of seconds waited before the check.
+    """
+
+    def __init__(
+        self,
+        table_name: str,
+        entries: dict[str, Any],
+        found_item: dict[str, Any],
+        delay: float,
+    ) -> None:
+        self.table_name = table_name
+        self.entries = entries
+        self.found_item = found_item
+        self.delay = delay
+        super().__init__(
+            f"Unexpected item matching {entries!r} found"
+            f" in table {table_name} after {delay}s delay: {found_item!r}"
+        )
 
 
 class DynamoDBNonNumericFieldError(Exception):
@@ -115,19 +249,33 @@ class LambdaResponseMismatchError(Exception):
 
     Attributes:
         function_name: Name or ARN of the Lambda function that was invoked.
-        payload: The full parsed response payload that was returned.
+        actual: The full parsed response payload that was returned, or None if
+            the function raised an error before a payload could be parsed.
+        expected_status: The status code the caller expected, or None if not checked.
+        expected_body: The body subset the caller expected, or None if not checked.
     """
 
     def __init__(
         self,
         function_name: str,
-        payload: dict[str, Any],
+        actual: dict[str, Any] | None,
+        *,
+        expected_status: int | None = None,
+        expected_body: dict[str, Any] | None = None,
     ) -> None:
         self.function_name = function_name
-        self.payload = payload
+        self.actual = actual
+        self.expected_status = expected_status
+        self.expected_body = expected_body
+        parts: list[str] = []
+        if expected_status is not None:
+            parts.append(f"expected_status={expected_status!r}")
+        if expected_body is not None:
+            parts.append(f"expected_body={expected_body!r}")
+        expected_desc = ", ".join(parts) if parts else "no expectations provided"
         super().__init__(
-            f"Lambda function {function_name!r} response did not match expectations:"
-            f" got {payload!r}"
+            f"Lambda function {function_name!r} response did not match expectations"
+            f" ({expected_desc}); got actual={actual!r}"
         )
 
 
