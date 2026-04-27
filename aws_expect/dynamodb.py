@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import time
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
-from aws_expect._utils import _compute_delay, _matches_entries
-from aws_expect.exceptions import DynamoDBNonNumericFieldError, DynamoDBWaitTimeoutError
+from aws_expect._utils import _compute_delay, _deep_matches, _matches_entries
+from aws_expect.exceptions import (
+    DynamoDBFindItemTimeoutError,
+    DynamoDBNonNumericFieldError,
+    DynamoDBUnexpectedItemError,
+    DynamoDBWaitTimeoutError,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource, Table
@@ -211,6 +216,114 @@ class DynamoDBItemExpectation:
                     ),
                 )
             time.sleep(min(delay, remaining))
+
+    def to_find_item(
+        self,
+        entries: dict[str, Any],
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> dict[str, Any]:
+        """Scan the table until at least one item deep-matches *entries*.
+
+        Paginates through all pages on each poll iteration following
+        ``LastEvaluatedKey``. Returns immediately when the first matching
+        item is found, without fetching further pages. The ``actual`` field
+        in the timeout error reflects the last *complete* (no-match) pass,
+        not a partial pass that was interrupted by timeout.
+
+        Args:
+            entries: Subset dict to match against each scanned item using
+                recursive deep matching. Partial dicts match items that
+                contain at least those key-value pairs.
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+
+        Returns:
+            The first full item dict that deep-matches *entries*.
+
+        Raises:
+            DynamoDBFindItemTimeoutError: If no matching item is found
+                within *timeout*. Error stores ``.expected``, ``.actual``
+                (last complete scan result or None), ``.timeout``,
+                ``.table_name``.
+        """
+        delay = _compute_delay(poll_interval)
+        deadline = time.monotonic() + timeout
+        last_scan: list[dict[str, Any]] | None = None
+
+        while True:
+            current_scan: list[dict[str, Any]] = []
+            for item in self._scan_pages():
+                if time.monotonic() >= deadline:
+                    raise DynamoDBFindItemTimeoutError(
+                        self._table_name, entries, last_scan, timeout
+                    )
+                if _deep_matches(item, entries):
+                    return item
+                current_scan.append(item)
+
+            last_scan = current_scan
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise DynamoDBFindItemTimeoutError(
+                    self._table_name, entries, last_scan, timeout
+                )
+            time.sleep(min(delay, remaining))
+
+    def to_not_find_item(
+        self,
+        entries: dict[str, Any],
+        delay: float = 1,
+    ) -> None:
+        """Assert no item in the table deep-matches *entries* after a delay.
+
+        Waits *computed_delay* seconds (clamped to a minimum of 1 via
+        ``_compute_delay``), then performs a single paginated scan across all
+        pages.  Callers that pass ``delay=0`` will still wait at least 1 second
+        because of the enforced minimum.
+
+        If any item on any page deep-matches *entries*, raises
+        ``DynamoDBUnexpectedItemError`` immediately without scanning further
+        pages.
+
+        Args:
+            entries: Subset dict to match against each scanned item using
+                recursive deep matching.
+            delay: Seconds to wait before the check.  Values below 1 are
+                clamped to a minimum of 1 second.
+
+        Returns:
+            None when no matching item is found.
+
+        Raises:
+            DynamoDBUnexpectedItemError: If any item deep-matches *entries*.
+                Error stores ``.table_name``, ``.entries``, ``.found_item``,
+                ``.delay`` (the actually waited seconds, after clamping).
+        """
+        computed_delay = _compute_delay(delay)
+        time.sleep(computed_delay)
+
+        for item in self._scan_pages():
+            if _deep_matches(item, entries):
+                raise DynamoDBUnexpectedItemError(
+                    self._table_name, entries, item, computed_delay
+                )
+
+        return None
+
+    def _scan_pages(self) -> Iterator[dict[str, Any]]:
+        """Yield every item in the table, paginating automatically."""
+        exclusive_start_key: dict[str, Any] | None = None
+        while True:
+            kwargs: dict[str, Any] = {}
+            if exclusive_start_key is not None:
+                kwargs["ExclusiveStartKey"] = exclusive_start_key
+            response = self._table.scan(**kwargs)
+            for item in response.get("Items", []):
+                yield item
+            exclusive_start_key = response.get("LastEvaluatedKey")
+            if exclusive_start_key is None:
+                break
 
     def to_not_exist(
         self,

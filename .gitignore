@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Planning and milestone artifacts
+.planning/
+
+# IDE and editor files
+.opencode/

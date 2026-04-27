@@ -3,10 +3,14 @@ __version__ = "1.0.0"
 from aws_expect.dynamodb import DynamoDBItemExpectation, DynamoDBTableExpectation
 from aws_expect.exceptions import (
     AggregateWaitTimeoutError,
+    DynamoDBFindItemTimeoutError,
     DynamoDBNonNumericFieldError,
+    DynamoDBUnexpectedItemError,
     DynamoDBWaitTimeoutError,
     LambdaResponseMismatchError,
     LambdaWaitTimeoutError,
+    S3ContentWaitTimeoutError,
+    S3UnexpectedContentError,
     S3WaitTimeoutError,
     SQSEventWaitTimeoutError,
     SQSUnexpectedEventError,
@@ -28,14 +32,18 @@ from aws_expect.sqs import SQSQueueExpectation
 
 __all__ = [
     "AggregateWaitTimeoutError",
+    "DynamoDBFindItemTimeoutError",
     "DynamoDBItemExpectation",
     "DynamoDBNonNumericFieldError",
     "DynamoDBTableExpectation",
+    "DynamoDBUnexpectedItemError",
     "DynamoDBWaitTimeoutError",
     "LambdaFunctionExpectation",
     "LambdaResponseMismatchError",
     "LambdaWaitTimeoutError",
+    "S3ContentWaitTimeoutError",
     "S3ObjectExpectation",
+    "S3UnexpectedContentError",
     "S3WaitTimeoutError",
     "SQSEventWaitTimeoutError",
     "SQSQueueExpectation",

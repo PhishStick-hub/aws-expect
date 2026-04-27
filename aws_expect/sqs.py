@@ -5,7 +5,7 @@ import time
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
-from aws_expect._utils import _compute_delay
+from aws_expect._utils import _compute_delay, _deep_matches
 from aws_expect.exceptions import (
     SQSEventWaitTimeoutError,
     SQSUnexpectedEventError,
@@ -225,32 +225,7 @@ class SQSQueueExpectation:
             body = json.loads(message["Body"])
         except (json.JSONDecodeError, ValueError):
             return False
-        return isinstance(body, dict) and self._deep_matches(body, event)
-
-    @staticmethod
-    def _deep_matches(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
-        """Check whether *actual* contains all key-value pairs in *expected*.
-
-        Recurses into nested dicts. Lists and all other types use exact equality.
-
-        Args:
-            actual: The parsed JSON dict from the SQS message body.
-            expected: The subset dict to match against.
-
-        Returns:
-            True if every key in *expected* is present in *actual* and matches.
-        """
-        for key, value in expected.items():
-            if key not in actual:
-                return False
-            if isinstance(value, dict):
-                if not isinstance(actual[key], dict):
-                    return False
-                if not SQSQueueExpectation._deep_matches(actual[key], value):
-                    return False
-            elif actual[key] != value:
-                return False
-        return True
+        return isinstance(body, dict) and _deep_matches(body, event)
 
     def to_have_event(
         self,

@@ -6,8 +6,17 @@ from typing import TYPE_CHECKING, Any, overload
 
 from botocore.exceptions import ClientError, WaiterError
 
-from aws_expect._utils import _build_waiter_config, _compute_delay, _matches_entries
-from aws_expect.exceptions import S3WaitTimeoutError
+from aws_expect._utils import (
+    _build_waiter_config,
+    _compute_delay,
+    _deep_matches,
+    _matches_entries,
+)
+from aws_expect.exceptions import (
+    S3ContentWaitTimeoutError,
+    S3UnexpectedContentError,
+    S3WaitTimeoutError,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.service_resource import Object as S3Object
@@ -83,6 +92,24 @@ class S3ObjectExpectation:
             raise S3WaitTimeoutError(self._bucket, self._key, timeout) from exc
         return self._client.head_object(Bucket=self._bucket, Key=self._key)
 
+    def _fetch_body(self) -> dict[str, Any] | None:
+        """Fetch and parse the S3 object body as JSON.
+
+        Returns the parsed dict on success, or ``None`` when the object
+        does not yet exist (NoSuchKey/404) or the body is not valid JSON.
+        Re-raises any other ``ClientError``.
+        """
+        try:
+            response = self._client.get_object(Bucket=self._bucket, Key=self._key)
+            body = json.loads(response["Body"].read())
+            return body if isinstance(body, dict) else None
+        except ClientError as err:
+            if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
+                raise
+            return None
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+
     def _poll_for_entries(
         self,
         timeout: float,
@@ -94,23 +121,81 @@ class S3ObjectExpectation:
         deadline = time.monotonic() + timeout
 
         while True:
-            try:
-                response = self._client.get_object(Bucket=self._bucket, Key=self._key)
-                body = json.loads(response["Body"].read())
-                if isinstance(body, dict) and _matches_entries(body, entries):
-                    return body
-            except ClientError as err:
-                # Object does not exist yet – keep polling.
-                if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
-                    raise
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                # Body isn't valid JSON – treat as non-match, keep polling.
-                pass
+            body = self._fetch_body()
+            if body is not None and _matches_entries(body, entries):
+                return body
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise S3WaitTimeoutError(self._bucket, self._key, timeout)
             time.sleep(min(delay, remaining))
+
+    def to_have_content(
+        self,
+        entries: dict[str, Any],
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> dict[str, Any]:
+        """Wait until the S3 object body is valid JSON that deep-matches *entries*.
+
+        Args:
+            entries: Dict whose key-value pairs must all be present (recursively)
+                in the parsed JSON body.
+            timeout: Maximum seconds to wait. Defaults to 30.
+            poll_interval: Seconds between polls. Clamped to minimum 1 second.
+                Defaults to 5.
+
+        Returns:
+            The full parsed JSON body dict when a match is found.
+
+        Raises:
+            S3ContentWaitTimeoutError: If no matching body is found before timeout.
+                The error stores .expected and .actual for debugging.
+        """
+        delay = _compute_delay(poll_interval)
+        deadline = time.monotonic() + timeout
+        last_body: dict[str, Any] | None = None
+
+        while True:
+            body = self._fetch_body()
+            if body is not None:
+                last_body = body
+                if _deep_matches(body, entries):
+                    return body
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise S3ContentWaitTimeoutError(
+                    self._bucket, self._key, entries, last_body, timeout
+                )
+            time.sleep(min(delay, remaining))
+
+    def to_not_have_content(
+        self,
+        entries: dict[str, Any],
+        delay: float = 0,
+    ) -> None:
+        """Assert the S3 object body does not deep-match *entries* after *delay* seconds.
+
+        Waits *delay* seconds (minimum 1 second via _compute_delay), then reads
+        the object body once. If the body is valid JSON and deep-matches *entries*,
+        raises S3UnexpectedContentError. Otherwise returns None.
+
+        Args:
+            entries: Dict to check against the object body.
+            delay: Seconds to wait before the check. Minimum 1 second. Defaults to 0.
+
+        Returns:
+            None if the object is missing, body is non-JSON, or body does not match.
+
+        Raises:
+            S3UnexpectedContentError: If the body IS valid JSON and DOES deep-match
+                *entries*.
+        """
+        time.sleep(_compute_delay(delay))
+        body = self._fetch_body()
+        if body is not None and _deep_matches(body, entries):
+            raise S3UnexpectedContentError(self._bucket, self._key, entries, delay)
 
     def to_not_exist(self, timeout: float = 30, poll_interval: float = 5) -> None:
         """Wait for the S3 object to not exist using the native ``object_not_exists`` waiter.

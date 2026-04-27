@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, Any
 
 from botocore.exceptions import ClientError, WaiterError
 
-from aws_expect._utils import _build_waiter_config, _compute_delay, _matches_entries
+from aws_expect._utils import (
+    _build_waiter_config,
+    _compute_delay,
+    _deep_matches,
+    _matches_entries,
+)
 from aws_expect.exceptions import LambdaResponseMismatchError, LambdaWaitTimeoutError
 
 if TYPE_CHECKING:
@@ -207,6 +212,8 @@ class LambdaFunctionExpectation:
                 )
                 if entries is None or _matches_entries(response_payload, entries):
                     return response_payload
+            else:
+                response["Payload"].read()  # drain to release the HTTP connection
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -240,16 +247,37 @@ class LambdaFunctionExpectation:
             LambdaResponseMismatchError: If the response has a ``FunctionError`` or does
                 not match the expected *status_code* / *body*.
         """
+        if status_code is None and body is None:
+            raise ValueError("At least one of status_code or body must be provided.")
+
         invoke_kwargs: dict[str, Any] = {"FunctionName": function_name}
         if payload is not None:
             invoke_kwargs["Payload"] = json.dumps(payload).encode()
 
         response = self._client.invoke(**invoke_kwargs)
         if response.get("FunctionError"):
-            raise LambdaResponseMismatchError(function_name, {})
-        response_payload: dict[str, Any] = json.loads(response["Payload"].read())
+            raise LambdaResponseMismatchError(
+                function_name,
+                None,
+                expected_status=status_code,
+                expected_body=body,
+            )
+        try:
+            response_payload: dict[str, Any] = json.loads(response["Payload"].read())
+        except (ValueError, TypeError):
+            raise LambdaResponseMismatchError(
+                function_name,
+                None,
+                expected_status=status_code,
+                expected_body=body,
+            )
         if not self._matches_response(response_payload, status_code, body):
-            raise LambdaResponseMismatchError(function_name, response_payload)
+            raise LambdaResponseMismatchError(
+                function_name,
+                response_payload,
+                expected_status=status_code,
+                expected_body=body,
+            )
         return response_payload
 
     @staticmethod
@@ -261,7 +289,7 @@ class LambdaFunctionExpectation:
         """Check that *payload* satisfies the expected *status_code* and *body*.
 
         *body* is matched against the JSON-parsed ``body`` field of *payload*
-        using a shallow subset match. Returns ``False`` if the ``body`` field
+        using a deep recursive subset match. Returns ``False`` if the ``body`` field
         is missing or not valid JSON when *body* entries are requested.
         """
         if status_code is not None and payload.get("statusCode") != status_code:
@@ -271,6 +299,8 @@ class LambdaFunctionExpectation:
                 parsed_body: dict[str, Any] = json.loads(payload.get("body", ""))
             except (ValueError, TypeError):
                 return False
-            if not all(parsed_body.get(k) == v for k, v in body.items()):
+            if not isinstance(parsed_body, dict):
+                return False
+            if not _deep_matches(parsed_body, body):
                 return False
         return True

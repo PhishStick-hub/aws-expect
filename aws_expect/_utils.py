@@ -26,3 +26,28 @@ def _build_waiter_config(timeout: float, poll_interval: float) -> WaiterConfigTy
     delay = _compute_delay(poll_interval)
     max_attempts = max(1, math.ceil(timeout / delay))
     return {"Delay": delay, "MaxAttempts": max_attempts}
+
+
+def _deep_matches(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
+    """Check whether *actual* contains all key-value pairs in *expected*.
+
+    Recurses into nested dicts. Lists and all other types use exact equality.
+
+    Args:
+        actual: The parsed JSON dict to test against.
+        expected: The subset dict to match against.
+
+    Returns:
+        True if every key in *expected* is present in *actual* and matches.
+    """
+    for key, value in expected.items():
+        if key not in actual:
+            return False
+        if isinstance(value, dict):
+            if not isinstance(actual[key], dict):
+                return False
+            if not _deep_matches(actual[key], value):
+                return False
+        elif actual[key] != value:
+            return False
+    return True
