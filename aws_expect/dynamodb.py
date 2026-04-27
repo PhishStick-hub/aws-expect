@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 from aws_expect._utils import _compute_delay, _deep_matches, _matches_entries
 from aws_expect.exceptions import (
@@ -253,32 +253,14 @@ class DynamoDBItemExpectation:
 
         while True:
             current_scan: list[dict[str, Any]] = []
-            exclusive_start_key: dict[str, Any] | None = None
-
-            while True:
-                # Check the deadline before each page fetch so that a
-                # long paginated scan across many pages cannot silently
-                # exceed the caller's timeout.
+            for item in self._scan_pages():
                 if time.monotonic() >= deadline:
                     raise DynamoDBFindItemTimeoutError(
                         self._table_name, entries, last_scan, timeout
                     )
-
-                kwargs: dict[str, Any] = {}
-                if exclusive_start_key is not None:
-                    kwargs["ExclusiveStartKey"] = exclusive_start_key
-
-                response = self._table.scan(**kwargs)
-                items: list[dict[str, Any]] = response.get("Items", [])
-
-                for item in items:
-                    if _deep_matches(item, entries):
-                        return item
-                    current_scan.append(item)
-
-                exclusive_start_key = response.get("LastEvaluatedKey")
-                if exclusive_start_key is None:
-                    break
+                if _deep_matches(item, entries):
+                    return item
+                current_scan.append(item)
 
             last_scan = current_scan
             remaining = deadline - time.monotonic()
@@ -321,24 +303,27 @@ class DynamoDBItemExpectation:
         computed_delay = _compute_delay(delay)
         time.sleep(computed_delay)
 
+        for item in self._scan_pages():
+            if _deep_matches(item, entries):
+                raise DynamoDBUnexpectedItemError(
+                    self._table_name, entries, item, computed_delay
+                )
+
+        return None
+
+    def _scan_pages(self) -> Iterator[dict[str, Any]]:
+        """Yield every item in the table, paginating automatically."""
         exclusive_start_key: dict[str, Any] | None = None
         while True:
             kwargs: dict[str, Any] = {}
             if exclusive_start_key is not None:
                 kwargs["ExclusiveStartKey"] = exclusive_start_key
-
             response = self._table.scan(**kwargs)
-            items: list[dict[str, Any]] = response.get("Items", [])
-
-            for item in items:
-                if _deep_matches(item, entries):
-                    raise DynamoDBUnexpectedItemError(
-                        self._table_name, entries, item, computed_delay
-                    )
-
+            for item in response.get("Items", []):
+                yield item
             exclusive_start_key = response.get("LastEvaluatedKey")
             if exclusive_start_key is None:
-                return None
+                break
 
     def to_not_exist(
         self,
