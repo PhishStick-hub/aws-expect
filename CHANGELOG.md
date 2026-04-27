@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/PhishStick-hub/aws-expect/compare/v1.0.0...v1.1.0) (2026-04-27)
+
+
+### Features
+
+* add richer assertions for S3 content, DynamoDB scan, and Lambda response ([#21](https://github.com/PhishStick-hub/aws-expect/issues/21)) ([0cd7d1a](https://github.com/PhishStick-hub/aws-expect/commit/0cd7d1aa6b9780f546034502c4f2bfff554e2bd4))
+
 ## [1.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v0.6.1...v1.0.0) (2026-04-14)
 
 
