@@ -2,7 +2,13 @@
   "bootstrap-sha": "610034143473f525d840a0e61d8ba48613d8c457",
   "packages": {
     ".": {
-      "release-type": "python"
+      "release-type": "python",
+      "extra-files": [
+        {
+          "type": "python",
+          "path": "aws_expect/__init__.py"
+        }
+      ]
     }
   }
 }
