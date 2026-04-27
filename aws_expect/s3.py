@@ -92,6 +92,24 @@ class S3ObjectExpectation:
             raise S3WaitTimeoutError(self._bucket, self._key, timeout) from exc
         return self._client.head_object(Bucket=self._bucket, Key=self._key)
 
+    def _fetch_body(self) -> dict[str, Any] | None:
+        """Fetch and parse the S3 object body as JSON.
+
+        Returns the parsed dict on success, or ``None`` when the object
+        does not yet exist (NoSuchKey/404) or the body is not valid JSON.
+        Re-raises any other ``ClientError``.
+        """
+        try:
+            response = self._client.get_object(Bucket=self._bucket, Key=self._key)
+            body = json.loads(response["Body"].read())
+            return body if isinstance(body, dict) else None
+        except ClientError as err:
+            if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
+                raise
+            return None
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+
     def _poll_for_entries(
         self,
         timeout: float,
@@ -103,18 +121,9 @@ class S3ObjectExpectation:
         deadline = time.monotonic() + timeout
 
         while True:
-            try:
-                response = self._client.get_object(Bucket=self._bucket, Key=self._key)
-                body = json.loads(response["Body"].read())
-                if isinstance(body, dict) and _matches_entries(body, entries):
-                    return body
-            except ClientError as err:
-                # Object does not exist yet – keep polling.
-                if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
-                    raise
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                # Body isn't valid JSON – treat as non-match, keep polling.
-                pass
+            body = self._fetch_body()
+            if body is not None and _matches_entries(body, entries):
+                return body
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -148,18 +157,11 @@ class S3ObjectExpectation:
         last_body: dict[str, Any] | None = None
 
         while True:
-            try:
-                response = self._client.get_object(Bucket=self._bucket, Key=self._key)
-                body = json.loads(response["Body"].read())
-                if isinstance(body, dict):
-                    last_body = body
-                    if _deep_matches(body, entries):
-                        return body
-            except ClientError as err:
-                if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
-                    raise
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                pass
+            body = self._fetch_body()
+            if body is not None:
+                last_body = body
+                if _deep_matches(body, entries):
+                    return body
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -191,16 +193,9 @@ class S3ObjectExpectation:
                 *entries*.
         """
         time.sleep(_compute_delay(delay))
-        try:
-            response = self._client.get_object(Bucket=self._bucket, Key=self._key)
-            body = json.loads(response["Body"].read())
-            if isinstance(body, dict) and _deep_matches(body, entries):
-                raise S3UnexpectedContentError(self._bucket, self._key, entries, delay)
-        except ClientError as err:
-            if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
-                raise
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            pass
+        body = self._fetch_body()
+        if body is not None and _deep_matches(body, entries):
+            raise S3UnexpectedContentError(self._bucket, self._key, entries, delay)
 
     def to_not_exist(self, timeout: float = 30, poll_interval: float = 5) -> None:
         """Wait for the S3 object to not exist using the native ``object_not_exists`` waiter.
