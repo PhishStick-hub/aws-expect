@@ -60,15 +60,20 @@ class S3ObjectExpectation:
         and the ``head_object`` response metadata dict is returned.
 
         When *entries* is provided the object body is retrieved on each poll,
-        parsed as JSON, and checked for a **subset match** against *entries*.
-        The parsed body dict is returned on success.
+        parsed as JSON, and checked for a **shallow subset match** against
+        *entries* using :func:`_matches_entries`. This means top-level keys and
+        their values must be equal, but nested dicts are compared by equality
+        rather than recursively checked for a subset. For recursive (deep)
+        subset matching use :meth:`to_have_content` instead.
 
         Args:
             timeout: Maximum time in seconds to wait.
             poll_interval: Time in seconds between polling attempts (minimum 1).
-            entries: Optional dict of expected key-value pairs.  When
-                provided the item must contain **at least** these entries
-                (subset match) before the wait succeeds.
+            entries: Optional dict of expected key-value pairs. When provided
+                the parsed JSON body must contain **at least** these top-level
+                entries with equal values (**shallow** match — nested dicts must
+                match exactly, not as a subset). Use :meth:`to_have_content` for
+                deep recursive subset matching.
 
         Returns:
             The ``head_object`` response metadata dict when *entries* is
