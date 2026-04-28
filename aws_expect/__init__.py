@@ -26,7 +26,7 @@ from aws_expect.expect import (
     expect_sqs,
 )
 from aws_expect.lambda_function import LambdaFunctionExpectation
-from aws_expect.parallel import expect_all
+from aws_expect.parallel import expect_all, expect_any
 from aws_expect.s3 import S3ObjectExpectation
 from aws_expect.sqs import SQSQueueExpectation
 
@@ -52,6 +52,7 @@ __all__ = [
     "SQSWaitTimeoutError",
     "WaitTimeoutError",
     "expect_all",
+    "expect_any",
     "expect_dynamodb_item",
     "expect_dynamodb_table",
     "expect_lambda",
