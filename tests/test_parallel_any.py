@@ -100,9 +100,7 @@ class TestExpectAnySuccess:
         finally:
             timer.cancel()
 
-    def test_single_expectation_returns_its_result(
-        self, dynamodb_table: Table
-    ) -> None:
+    def test_single_expectation_returns_its_result(self, dynamodb_table: Table) -> None:
         dynamodb_table.put_item(Item={"pk": "solo", "val": "only"})
 
         result: dict[str, Any] = expect_any(
