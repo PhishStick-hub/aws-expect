@@ -101,16 +101,23 @@ class TestSQSToHaveEvent:
         assert exc_info.value.event == {"source": "my-app"}
         assert exc_info.value.timeout == 2
         assert exc_info.value.queue_url == sqs_queue.url
+        assert "Expected event:" in str(exc_info.value)
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "none" in str(exc_info.value)
 
     def test_raises_timeout_when_wrong_event_present(self, sqs_queue: Queue) -> None:
         _send_event(sqs_queue, {"source": "other-app"})
 
-        with pytest.raises(SQSEventWaitTimeoutError):
+        with pytest.raises(SQSEventWaitTimeoutError) as exc_info:
             expect_sqs(sqs_queue).to_have_event(
                 event={"source": "my-app"},
                 timeout=2,
                 poll_interval=1,
             )
+
+        assert "Expected event:" in str(exc_info.value)
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "other-app" in str(exc_info.value)
 
     def test_exception_chain_cause_is_sqs_wait_timeout_error(
         self, sqs_queue: Queue
@@ -129,12 +136,15 @@ class TestSQSToHaveEvent:
         """Non-destructive: message stays visible after a failed poll."""
         _send_event(sqs_queue, {"source": "other-app"})
 
-        with pytest.raises(SQSEventWaitTimeoutError):
+        with pytest.raises(SQSEventWaitTimeoutError) as exc_info:
             expect_sqs(sqs_queue).to_have_event(
                 event={"source": "my-app"},
                 timeout=2,
                 poll_interval=1,
             )
+
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "other-app" in str(exc_info.value)
 
         messages = sqs_queue.receive_messages(MaxNumberOfMessages=1)
         assert len(messages) == 1
@@ -252,6 +262,9 @@ class TestSQSToConsumeEvent:
 
         assert exc_info.value.event == {"source": "my-app"}
         assert exc_info.value.timeout == 2
+        assert "Expected event:" in str(exc_info.value)
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "none" in str(exc_info.value)
 
     def test_succeeds_when_event_appears_mid_poll(self, sqs_queue: Queue) -> None:
         def send_later() -> None:

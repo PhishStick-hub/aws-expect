@@ -8,7 +8,7 @@ import pytest
 from mypy_boto3_lambda.client import LambdaClient
 
 from aws_expect import WaitTimeoutError, expect_lambda
-from aws_expect.exceptions import LambdaWaitTimeoutError
+from aws_expect.exceptions import LambdaInvocableTimeoutError, LambdaWaitTimeoutError
 
 
 class TestToBeInvocable:
@@ -45,7 +45,7 @@ class TestToBeInvocable:
     def test_raises_when_entries_do_not_match(
         self, lambda_client: LambdaClient, lambda_function: str
     ) -> None:
-        with pytest.raises(LambdaWaitTimeoutError) as exc_info:
+        with pytest.raises(LambdaInvocableTimeoutError) as exc_info:
             expect_lambda(lambda_client).to_be_invocable(
                 lambda_function,
                 timeout=2,
@@ -54,6 +54,10 @@ class TestToBeInvocable:
             )
         assert exc_info.value.function_name == lambda_function
         assert exc_info.value.timeout == 2
+        assert "Expected entries:" in str(exc_info.value)
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert exc_info.value.expected == {"statusCode": 999}
+        assert isinstance(exc_info.value.actual, dict)
 
     def test_raises_when_handler_errors(
         self, lambda_client: LambdaClient, error_lambda_function: str

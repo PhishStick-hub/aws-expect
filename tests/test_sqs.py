@@ -38,24 +38,34 @@ class TestSQSToHaveMessage:
         assert exc_info.value.body == "hello"
         assert exc_info.value.timeout == 2
         assert exc_info.value.queue_url == sqs_queue.url
+        assert "Expected body:" in str(exc_info.value)
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "none" in str(exc_info.value)
 
     def test_raises_timeout_when_wrong_body_present(self, sqs_queue: Queue) -> None:
         sqs_queue.send_message(MessageBody="wrong")
 
-        with pytest.raises(SQSWaitTimeoutError):
+        with pytest.raises(SQSWaitTimeoutError) as exc_info:
             expect_sqs(sqs_queue).to_have_message(
                 body="right", timeout=2, poll_interval=1
             )
+
+        assert "Expected body:" in str(exc_info.value)
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "wrong" in str(exc_info.value)
 
     def test_message_remains_visible_after_non_matching_poll(
         self, sqs_queue: Queue
     ) -> None:
         sqs_queue.send_message(MessageBody="wrong")
 
-        with pytest.raises(SQSWaitTimeoutError):
+        with pytest.raises(SQSWaitTimeoutError) as exc_info:
             expect_sqs(sqs_queue).to_have_message(
                 body="right", timeout=2, poll_interval=1
             )
+
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "wrong" in str(exc_info.value)
 
         # "wrong" must still be receivable — non-destructive guarantee
         messages = sqs_queue.receive_messages(MaxNumberOfMessages=1)
@@ -118,6 +128,9 @@ class TestSQSToConsumeMessage:
 
         assert exc_info.value.body == "hello"
         assert exc_info.value.timeout == 2
+        assert "Expected body:" in str(exc_info.value)
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "none" in str(exc_info.value)
 
     def test_non_matching_message_restored_and_matching_consumed(
         self, sqs_queue: Queue

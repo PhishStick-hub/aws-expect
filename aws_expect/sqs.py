@@ -53,6 +53,7 @@ class SQSQueueExpectation:
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
+        last_batch: list[MessageTypeDef] = []
 
         while True:
             response = self._client.receive_message(
@@ -61,10 +62,14 @@ class SQSQueueExpectation:
                 VisibilityTimeout=visibility_timeout,
                 WaitTimeSeconds=0,
             )
-            yield response.get("Messages", [])
+            last_batch = response.get("Messages", [])
+            yield last_batch
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise SQSWaitTimeoutError(self._queue_url, error_hint, timeout)
+                actual_bodies = [m["Body"] for m in last_batch] if last_batch else None
+                raise SQSWaitTimeoutError(
+                    self._queue_url, error_hint, timeout, actual=actual_bodies
+                )
             time.sleep(min(delay, remaining))
 
     def to_have_message(
@@ -259,7 +264,21 @@ class SQSQueueExpectation:
                     if self._matches_event(message, event):
                         return message
         except SQSWaitTimeoutError as exc:
-            raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
+            actual_events: list[dict[str, Any]] | None = None
+            if exc.actual is not None:
+                actual_events = []
+                for body in exc.actual:
+                    try:
+                        parsed = json.loads(body)
+                        if isinstance(parsed, dict):
+                            actual_events.append(parsed)
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                if not actual_events:
+                    actual_events = None
+            raise SQSEventWaitTimeoutError(
+                self._queue_url, event, timeout, actual=actual_events
+            ) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
     def to_consume_event(
@@ -308,7 +327,21 @@ class SQSQueueExpectation:
                 # No match in this batch — restore all so they stay visible
                 self._restore_messages(messages)
         except SQSWaitTimeoutError as exc:
-            raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
+            actual_events: list[dict[str, Any]] | None = None
+            if exc.actual is not None:
+                actual_events = []
+                for body in exc.actual:
+                    try:
+                        parsed = json.loads(body)
+                        if isinstance(parsed, dict):
+                            actual_events.append(parsed)
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                if not actual_events:
+                    actual_events = None
+            raise SQSEventWaitTimeoutError(
+                self._queue_url, event, timeout, actual=actual_events
+            ) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
     def to_not_have_event(

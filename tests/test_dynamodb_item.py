@@ -78,13 +78,18 @@ class TestDynamoDBToExist:
     ) -> None:
         dynamodb_table.put_item(Item={"pk": "order-2", "status": "pending"})
 
-        with pytest.raises(DynamoDBWaitTimeoutError):
+        with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
             expect_dynamodb_item(dynamodb_table).to_exist(
                 key={"pk": "order-2"},
                 entries={"status": "shipped"},
                 timeout=2,
                 poll_interval=1,
             )
+
+        assert "Expected entries:" in str(exc_info.value)
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert "pending" in str(exc_info.value)
+        assert exc_info.value.actual == {"pk": "order-2", "status": "pending"}
 
     def test_succeeds_when_entries_match_after_update(
         self, dynamodb_table: Table
@@ -286,6 +291,8 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key == {"pk": "item-3"}
         assert exc_info.value.timeout == 2
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert exc_info.value.actual == {"pk": "item-3", "score": 50}
 
     def test_raises_immediately_when_field_not_numeric(
         self, dynamodb_table: Table
@@ -321,6 +328,8 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key == {"pk": "ghost"}
         assert exc_info.value.timeout == 2
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert exc_info.value.actual is None
 
     def test_raises_timeout_when_field_absent(self, dynamodb_table: Table) -> None:
         dynamodb_table.put_item(Item={"pk": "item-5", "other": "value"})
@@ -336,6 +345,8 @@ class TestDynamoDBToHaveNumericValueCloseTo:
             )
 
         assert exc_info.value.table_name == dynamodb_table.name
+        assert "Actual (last seen):" in str(exc_info.value)
+        assert exc_info.value.actual == {"pk": "item-5", "other": "value"}
 
     def test_catchable_as_base_wait_timeout_error(self, dynamodb_table: Table) -> None:
         """DynamoDBWaitTimeoutError is a WaitTimeoutError."""

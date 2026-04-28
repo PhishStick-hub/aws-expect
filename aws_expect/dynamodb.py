@@ -55,17 +55,19 @@ class DynamoDBItemExpectation:
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
+        last_item: dict[str, Any] | None = None
 
         while True:
             response = self._table.get_item(Key=key)
             item = response.get("Item")
+            last_item = item
             if item is not None:
                 if entries is None or _matches_entries(item, entries):
                     return item
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise DynamoDBWaitTimeoutError(
-                    self._table_name, key, timeout, entries=entries
+                    self._table_name, key, timeout, entries=entries, actual=last_item
                 )
             time.sleep(min(delay, remaining))
 
@@ -111,10 +113,12 @@ class DynamoDBItemExpectation:
             f"Timed out after {timeout}s waiting for item {key} field '{field}'"
             f" to be within {delta} of {expected} in table {self._table_name}"
         )
+        last_item: dict[str, Any] | None = None
 
         while True:
             response = self._table.get_item(Key=key)
             if (item := response.get("Item")) is not None:
+                last_item = item
                 if (value := item.get(field)) is not None:
                     if not isinstance(value, (int, float, Decimal)):
                         raise DynamoDBNonNumericFieldError(
@@ -125,7 +129,11 @@ class DynamoDBItemExpectation:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise DynamoDBWaitTimeoutError(
-                    self._table_name, key, timeout, message=timeout_message
+                    self._table_name,
+                    key,
+                    timeout,
+                    message=timeout_message,
+                    actual=last_item,
                 )
             time.sleep(min(delay, remaining))
 
