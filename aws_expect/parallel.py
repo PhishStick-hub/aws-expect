@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import TypeVar
 
 from aws_expect.exceptions import AggregateWaitTimeoutError, WaitTimeoutError
@@ -126,4 +126,32 @@ def expect_any(
             ),
         ])
     """
-    raise NotImplementedError  # noqa: EM101
+    if not expectations:
+        msg = "expectations must not be empty"
+        raise ValueError(msg)
+
+    workers = max_workers if max_workers is not None else len(expectations)
+    errors: list[WaitTimeoutError] = []
+    results: list[T | None] = [None] * len(expectations)
+
+    future_to_idx: dict[Future[T], int] = {}
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        for idx, expectation in enumerate(expectations):
+            future = executor.submit(expectation)
+            future_to_idx[future] = idx
+
+        for future in as_completed(future_to_idx):
+            exc = future.exception()
+            if exc is None:
+                # First success — return immediately.
+                # ThreadPoolExecutor.__exit__ will wait for remaining threads,
+                # but their results are discarded.
+                return future.result()
+            elif isinstance(exc, WaitTimeoutError):
+                errors.append(exc)
+            else:
+                # Non-WaitTimeoutError propagates immediately.
+                raise exc
+
+    # All futures completed with WaitTimeoutError.
+    raise AggregateWaitTimeoutError(errors=errors, results=results)
