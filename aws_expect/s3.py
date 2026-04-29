@@ -27,7 +27,6 @@ class S3ObjectExpectation:
     """Expectation wrapper for an S3 resource Object, using native boto3 waiters."""
 
     def __init__(self, s3_object: S3Object) -> None:
-        self._obj = s3_object
         self._bucket = s3_object.bucket_name
         self._key = s3_object.key
         self._client = s3_object.meta.client

@@ -380,7 +380,6 @@ class DynamoDBTableExpectation:
     def __init__(
         self, dynamodb_resource: DynamoDBServiceResource, table_name: str
     ) -> None:
-        self._resource = dynamodb_resource
         self._client = dynamodb_resource.meta.client
         self._table_name = table_name
 

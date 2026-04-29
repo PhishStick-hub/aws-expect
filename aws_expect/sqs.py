@@ -40,7 +40,6 @@ class SQSQueueExpectation:
     """Expectation wrapper for a boto3 SQS Queue resource."""
 
     def __init__(self, queue: SQSQueue) -> None:
-        self._queue = queue
         self._queue_url: str = queue.url
         self._client = queue.meta.client
 
