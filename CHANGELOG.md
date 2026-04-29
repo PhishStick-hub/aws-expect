@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/PhishStick-hub/aws-expect/compare/v1.1.0...v1.2.0) (2026-04-29)
+
+
+### Features
+
+* **dx:** add parallel execution support with expect_all and expect_any ([a7be4c4](https://github.com/PhishStick-hub/aws-expect/commit/a7be4c45b394d4049f80d96100bf6b581c495d81))
+
 ## [1.1.0](https://github.com/PhishStick-hub/aws-expect/compare/v1.0.0...v1.1.0) (2026-04-27)
 
 
