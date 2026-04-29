@@ -97,6 +97,8 @@ Tests use `testcontainers[localstack]` for a session-scoped LocalStack container
 
 **Lambda testing**: LocalStack 4 requires the Docker socket to be mounted (`/var/run/docker.sock`) for Lambda execution. The `localstack` fixture does this automatically. The `lambda_function` fixture creates a Python 3.13 function from an in-memory zip and waits for `function_active_v2` before yielding; teardown ignores `ResourceNotFoundException` in case the test already deleted the function. The `lambda_function_json_body` fixture creates a function whose `body` response field is a JSON-encoded dict (`{"message": "hello", "status": "ok"}`), used for `to_respond_with` tests.
 
+**Lambda handler stubs**: `_make_lambda_zip` deploys handlers via `inspect.getsource` — the function body is extracted verbatim and runs in an isolated Lambda environment with no access to conftest.py's module-level imports. Any stdlib module a handler needs (e.g. `json`) **must** be imported inside the function body with `# noqa: PLC0415`. Moving such imports to the module level breaks the deployed handler at runtime.
+
 ## Conventions
 
 - **Python 3.13+**, full type annotations required on all code
