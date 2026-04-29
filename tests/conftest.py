@@ -1,6 +1,5 @@
 import inspect
 import io
-import json
 import zipfile
 from collections.abc import Iterator
 from contextlib import suppress
@@ -147,10 +146,14 @@ def _error_handler(event, _context):
 
 
 def _json_body_handler(event, _context):
+    import json  # noqa: PLC0415
+
     return {"statusCode": 200, "body": json.dumps({"message": "hello", "status": "ok"})}
 
 
 def _nested_body_handler(event, _context):
+    import json  # noqa: PLC0415
+
     return {
         "statusCode": 200,
         "body": json.dumps(
