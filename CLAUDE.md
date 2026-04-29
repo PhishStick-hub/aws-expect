@@ -31,6 +31,11 @@ uv run ruff format .
 uv run ruff check --fix .  # auto-fix
 ```
 
+**Dead code detection:**
+```bash
+uv run vulture aws_expect/ tests/
+```
+
 **Build:**
 ```bash
 uv build
@@ -68,9 +73,9 @@ uv run ruff check . && uv run ruff format --check . && uv run ty check
 - **`dynamodb.py`** — `DynamoDBItemExpectation` (wraps a Table resource) and `DynamoDBTableExpectation` (wraps dynamodb resource + table name string); custom polling throughout
 - **`sqs.py`** — `SQSQueueExpectation`: wraps a boto3 SQS Queue resource; string-body methods (`to_have_message`, `to_consume_message`, `to_not_have_message`) and JSON event methods (`to_have_event`, `to_consume_event`, `to_not_have_event`) with deep recursive subset matching via `_deep_matches`
 - **`lambda_function.py`** — `LambdaFunctionExpectation`: wraps a boto3 Lambda **client** (no resource API exists); function name passed per method call. Methods: `to_exist`, `to_not_exist`, `to_be_active`, `to_be_updated` use native boto3 waiters; `to_be_invocable` uses custom polling with optional payload and entries subset matching; `to_respond_with` invokes the function **once** and asserts `statusCode` and/or the JSON-parsed `body` field (shallow subset); raises `LambdaResponseMismatchError` on mismatch (not a waiter).
-- **`parallel.py`** — `expect_all()`: runs multiple zero-argument callables concurrently via ThreadPoolExecutor; returns ordered results or raises `AggregateWaitTimeoutError`
-- **`exceptions.py`** — Exception hierarchy rooted at `WaitTimeoutError`; each subclass stores relevant context. `SQSUnexpectedMessageError` and `SQSUnexpectedEventError` inherit `Exception` directly (not `WaitTimeoutError`) as they represent unexpected presence, not a timeout.
-- **`__init__.py`** — Defines `__all__` as the public API
+- **`parallel.py`** — `expect_all()`: runs multiple zero-argument callables concurrently via `ThreadPoolExecutor`; returns ordered results or raises `AggregateWaitTimeoutError`. `expect_any()`: same concurrency model but returns the result of the first callable to succeed; raises `AggregateWaitTimeoutError` only if every callable times out.
+- **`exceptions.py`** — Exception hierarchy rooted at `WaitTimeoutError`; each subclass stores relevant context and includes an `actual` field (last-seen value) surfaced in the error message. `LambdaInvocableTimeoutError` is a `LambdaWaitTimeoutError` subclass raised specifically by `to_be_invocable` when `entries` matching fails, carrying `expected` and `actual` payload dicts. `LambdaResponseMismatchError` and `SQSUnexpectedMessageError`/`SQSUnexpectedEventError` inherit `Exception` directly (not `WaitTimeoutError`) as they represent assertion failures, not timeouts.
+- **`__init__.py`** — Defines `__all__` as the public API; exports `expect_all`, `expect_any`, `LambdaInvocableTimeoutError`, `LambdaResponseMismatchError` alongside all other factory functions and exception classes
 
 ### Polling Pattern
 
