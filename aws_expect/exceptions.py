@@ -102,15 +102,24 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         timeout: float,
         message: str | None = None,
         entries: dict[str, Any] | None = None,
+        actual: dict[str, Any] | None = None,
     ) -> None:
         self.table_name = table_name
         self.key = key
         self.timeout = timeout
         self.entries = entries
+        self.actual = actual
+        actual_str = repr(actual) if actual is not None else "None"
         if message is not None:
-            msg = message
+            msg = f"{message}\n\nActual (last seen):\n  {actual_str}"
         elif entries is not None:
-            msg = f"Timed out after {timeout}s waiting for item {key} with entries {entries} in table {table_name}"
+            msg = (
+                f"Timed out after {timeout}s waiting for item {key} in table {table_name}\n\n"
+                f"Expected entries:\n"
+                f"  {entries!r}\n\n"
+                f"Actual (last seen):\n"
+                f"  {actual_str}"
+            )
         else:
             msg = f"Timed out after {timeout}s waiting for item {key} in table {table_name}"
         super().__init__(msg)
@@ -241,6 +250,40 @@ class LambdaWaitTimeoutError(WaitTimeoutError):
         )
 
 
+class LambdaInvocableTimeoutError(LambdaWaitTimeoutError):
+    """Raised when to_be_invocable times out without a matching response.
+
+    Attributes:
+        function_name: Name or ARN of the Lambda function.
+        expected: The entries dict that was never matched.
+        actual: The last parsed response payload dict, or None if no invocation
+            produced a parseable response.
+        timeout: The timeout that was configured.
+    """
+
+    def __init__(
+        self,
+        function_name: str,
+        expected: dict[str, Any],
+        actual: dict[str, Any] | None,
+        timeout: float,
+    ) -> None:
+        self.function_name = function_name
+        self.expected = expected
+        self.actual = actual
+        self.timeout = timeout
+        actual_str = repr(actual) if actual is not None else "None"
+        WaitTimeoutError.__init__(
+            self,
+            f"Timed out after {timeout}s waiting for Lambda function {function_name!r}"
+            f" to be invocable\n\n"
+            f"Expected entries:\n"
+            f"  {expected!r}\n\n"
+            f"Actual (last seen):\n"
+            f"  {actual_str}",
+        )
+
+
 class LambdaResponseMismatchError(Exception):
     """Raised when a Lambda invocation response does not match expectations.
 
@@ -282,14 +325,26 @@ class LambdaResponseMismatchError(Exception):
 class SQSWaitTimeoutError(WaitTimeoutError):
     """Raised when an SQS wait operation exceeds the specified timeout."""
 
-    def __init__(self, queue_url: str, body: str, timeout: float) -> None:
+    def __init__(
+        self,
+        queue_url: str,
+        body: str,
+        timeout: float,
+        actual: list[str] | None = None,
+    ) -> None:
         self.queue_url = queue_url
         self.body = body
         self.timeout = timeout
-        super().__init__(
-            f"Timed out after {timeout}s waiting for message with body={body!r}"
-            f" in queue {queue_url}"
+        self.actual = actual
+        actual_str = repr(actual) if actual is not None else "None"
+        msg = (
+            f"Timed out after {timeout}s waiting for message in queue {queue_url}\n\n"
+            f"Expected body:\n"
+            f"  {body!r}\n\n"
+            f"Actual (last seen):\n"
+            f"  {actual_str}"
         )
+        super().__init__(msg)
 
 
 class SQSUnexpectedMessageError(Exception):
@@ -325,14 +380,26 @@ class SQSEventWaitTimeoutError(WaitTimeoutError):
         timeout: The timeout that was configured for the wait.
     """
 
-    def __init__(self, queue_url: str, event: dict[str, Any], timeout: float) -> None:
+    def __init__(
+        self,
+        queue_url: str,
+        event: dict[str, Any],
+        timeout: float,
+        actual: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.queue_url = queue_url
         self.event = event
         self.timeout = timeout
-        super().__init__(
-            f"Timed out after {timeout}s waiting for event matching {event!r}"
-            f" in queue {queue_url}"
+        self.actual = actual
+        actual_str = repr(actual) if actual is not None else "None"
+        msg = (
+            f"Timed out after {timeout}s waiting for event in queue {queue_url}\n\n"
+            f"Expected event:\n"
+            f"  {event!r}\n\n"
+            f"Actual (last seen):\n"
+            f"  {actual_str}"
         )
+        super().__init__(msg)
 
 
 class SQSUnexpectedEventError(Exception):

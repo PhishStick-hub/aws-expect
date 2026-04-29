@@ -14,7 +14,11 @@ from aws_expect._utils import (
     _deep_matches,
     _matches_entries,
 )
-from aws_expect.exceptions import LambdaResponseMismatchError, LambdaWaitTimeoutError
+from aws_expect.exceptions import (
+    LambdaInvocableTimeoutError,
+    LambdaResponseMismatchError,
+    LambdaWaitTimeoutError,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_lambda.client import LambdaClient
@@ -204,6 +208,8 @@ class LambdaFunctionExpectation:
         if payload is not None:
             invoke_kwargs["Payload"] = json.dumps(payload).encode()
 
+        last_actual: dict[str, Any] | None = None
+
         while True:
             response = self._client.invoke(**invoke_kwargs)
             if not response.get("FunctionError"):
@@ -212,11 +218,16 @@ class LambdaFunctionExpectation:
                 )
                 if entries is None or _matches_entries(response_payload, entries):
                     return response_payload
+                last_actual = response_payload
             else:
                 response["Payload"].read()  # drain to release the HTTP connection
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
+                if entries is not None:
+                    raise LambdaInvocableTimeoutError(
+                        function_name, entries, last_actual, timeout
+                    )
                 raise LambdaWaitTimeoutError(function_name, timeout)
             time.sleep(min(delay, remaining))
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import TypeVar
 
 from aws_expect.exceptions import AggregateWaitTimeoutError, WaitTimeoutError
@@ -82,3 +82,74 @@ def expect_all(
 
     # At this point every entry is a real T, not None.
     return results  # type: ignore[return-value]
+
+
+def expect_any(
+    expectations: Sequence[Callable[[], T]],
+    *,
+    max_workers: int | None = None,
+) -> T:
+    """Run multiple expectations in parallel and return the first to succeed.
+
+    Each expectation is a zero-argument callable that performs a wait
+    operation. All expectations are submitted to a thread pool and executed
+    concurrently. The function returns the result of whichever callable
+    completes successfully first. The remaining callables continue running
+    until their own timeouts expire; their results are discarded.
+
+    Args:
+        expectations: A sequence of zero-argument callables. Each
+            callable should invoke an expectation method and return
+            its result.
+        max_workers: Maximum number of threads. Defaults to the
+            number of expectations so that all run truly in parallel.
+
+    Returns:
+        The result of the first callable that succeeds.
+
+    Raises:
+        AggregateWaitTimeoutError: If every callable raises
+            :class:`WaitTimeoutError` before any succeeds. Contains
+            all individual errors and a ``results`` list of ``None``
+            entries.
+        ValueError: If *expectations* is empty.
+
+    Example::
+
+        from aws_expect import expect_any, expect_dynamodb_item
+
+        result = expect_any([
+            lambda: expect_dynamodb_item(table_a).to_exist(
+                key={"pk": "u1"}, timeout=30,
+            ),
+            lambda: expect_dynamodb_item(table_b).to_exist(
+                key={"pk": "u1"}, timeout=30,
+            ),
+        ])
+    """
+    if not expectations:
+        msg = "expectations must not be empty"
+        raise ValueError(msg)
+
+    workers = max_workers if max_workers is not None else len(expectations)
+    errors: list[WaitTimeoutError] = []
+    results: list[T | None] = [None] * len(expectations)
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(exp) for exp in expectations]
+
+        for future in as_completed(futures):
+            exc = future.exception()
+            if exc is None:
+                # First success — return immediately.
+                # ThreadPoolExecutor.__exit__ will wait for remaining threads,
+                # but their results are discarded.
+                return future.result()
+            elif isinstance(exc, WaitTimeoutError):
+                errors.append(exc)
+            else:
+                # Non-WaitTimeoutError propagates immediately.
+                raise exc
+
+    # All futures completed with WaitTimeoutError.
+    raise AggregateWaitTimeoutError(errors=errors, results=results)

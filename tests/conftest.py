@@ -137,21 +137,21 @@ def dynamodb_composite_table(
 _LAMBDA_ROLE = "arn:aws:iam::000000000000:role/lambda-role"
 
 
-def _default_handler(event, context):
+def _default_handler(event, _context):
     return {"statusCode": 200, "body": "hello"}
 
 
-def _error_handler(event, context):
+def _error_handler(event, _context):
     raise RuntimeError("intentional error")
 
 
-def _json_body_handler(event, context):
+def _json_body_handler(event, _context):
     import json  # noqa: PLC0415
 
     return {"statusCode": 200, "body": json.dumps({"message": "hello", "status": "ok"})}
 
 
-def _nested_body_handler(event, context):
+def _nested_body_handler(event, _context):
     import json  # noqa: PLC0415
 
     return {

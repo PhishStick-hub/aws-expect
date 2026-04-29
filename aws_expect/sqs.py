@@ -18,11 +18,28 @@ if TYPE_CHECKING:
     from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 
+def _parse_actual_events(
+    bodies: list[str] | None,
+) -> list[dict[str, Any]] | None:
+    if bodies is None:
+        return None
+    events = [
+        parsed for body in bodies if isinstance(parsed := _try_parse_json(body), dict)
+    ]
+    return events or None
+
+
+def _try_parse_json(body: str) -> Any:
+    try:
+        return json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 class SQSQueueExpectation:
     """Expectation wrapper for a boto3 SQS Queue resource."""
 
     def __init__(self, queue: SQSQueue) -> None:
-        self._queue = queue
         self._queue_url: str = queue.url
         self._client = queue.meta.client
 
@@ -53,6 +70,7 @@ class SQSQueueExpectation:
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
+        last_batch: list[MessageTypeDef] = []
 
         while True:
             response = self._client.receive_message(
@@ -61,10 +79,14 @@ class SQSQueueExpectation:
                 VisibilityTimeout=visibility_timeout,
                 WaitTimeSeconds=0,
             )
-            yield response.get("Messages", [])
+            last_batch = response.get("Messages", [])
+            yield last_batch
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise SQSWaitTimeoutError(self._queue_url, error_hint, timeout)
+                actual_bodies = [m["Body"] for m in last_batch] if last_batch else None
+                raise SQSWaitTimeoutError(
+                    self._queue_url, error_hint, timeout, actual=actual_bodies
+                )
             time.sleep(min(delay, remaining))
 
     def to_have_message(
@@ -259,7 +281,9 @@ class SQSQueueExpectation:
                     if self._matches_event(message, event):
                         return message
         except SQSWaitTimeoutError as exc:
-            raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
+            raise SQSEventWaitTimeoutError(
+                self._queue_url, event, timeout, actual=_parse_actual_events(exc.actual)
+            ) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
     def to_consume_event(
@@ -308,7 +332,9 @@ class SQSQueueExpectation:
                 # No match in this batch — restore all so they stay visible
                 self._restore_messages(messages)
         except SQSWaitTimeoutError as exc:
-            raise SQSEventWaitTimeoutError(self._queue_url, event, timeout) from exc
+            raise SQSEventWaitTimeoutError(
+                self._queue_url, event, timeout, actual=_parse_actual_events(exc.actual)
+            ) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
     def to_not_have_event(

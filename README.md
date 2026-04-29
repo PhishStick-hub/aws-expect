@@ -128,6 +128,16 @@ payload = expect_lambda(lambda_client).to_be_invocable(
     entries={"statusCode": 200},
     timeout=30,
 )
+
+# Invoke once and assert the response (not a waiter — raises immediately on mismatch)
+from aws_expect import LambdaResponseMismatchError
+
+result = expect_lambda(lambda_client).to_respond_with(
+    "my-function",
+    status_code=200,
+    body={"message": "hello"},
+    payload={"key": "value"},
+)
 ```
 
 ### Parallel Waiting
@@ -135,9 +145,18 @@ payload = expect_lambda(lambda_client).to_be_invocable(
 ```python
 from aws_expect import expect_all, expect_s3, expect_dynamodb_item
 
+# Wait for ALL expectations to succeed (raises if any times out)
 results = expect_all([
     lambda: expect_s3(obj).to_exist(timeout=30),
     lambda: expect_dynamodb_item(table).to_exist(key={"pk": "order-123"}, timeout=30),
+])
+
+# Wait for the FIRST expectation to succeed (returns its result)
+from aws_expect import expect_any, expect_dynamodb_item
+
+result = expect_any([
+    lambda: expect_dynamodb_item(table_a).to_exist(key={"pk": "u1"}, timeout=30),
+    lambda: expect_dynamodb_item(table_b).to_exist(key={"pk": "u1"}, timeout=30),
 ])
 ```
 
@@ -165,7 +184,8 @@ except WaitTimeoutError:
 | `expect_dynamodb_table(dynamodb, table_name)` | Creates `DynamoDBTableExpectation` |
 | `expect_sqs(queue)` | Creates `SQSQueueExpectation` |
 | `expect_lambda(lambda_client)` | Creates `LambdaFunctionExpectation` |
-| `expect_all(callables)` | Runs expectations concurrently |
+| `expect_all(callables)` | Runs expectations concurrently; returns all results or raises |
+| `expect_any(callables)` | Runs expectations concurrently; returns first to succeed |
 
 ### S3 (`S3ObjectExpectation`)
 
@@ -211,6 +231,7 @@ except WaitTimeoutError:
 | `to_be_active(function_name, timeout, poll_interval)` | Wait for `State == "Active"` |
 | `to_be_updated(function_name, timeout, poll_interval)` | Wait for `LastUpdateStatus == "Successful"` |
 | `to_be_invocable(function_name, timeout, poll_interval, payload, entries)` | Wait until invocation succeeds; optionally match response payload entries |
+| `to_respond_with(function_name, status_code, body, payload)` | Invoke once and assert `statusCode` and/or JSON `body` (not a waiter) |
 
 ## Exceptions
 
@@ -223,10 +244,12 @@ All timeout exceptions inherit from `WaitTimeoutError`:
 | `SQSWaitTimeoutError` | SQS string-body methods |
 | `SQSEventWaitTimeoutError` | SQS JSON event methods |
 | `LambdaWaitTimeoutError` | Lambda methods |
-| `AggregateWaitTimeoutError` | `expect_all` |
+| `AggregateWaitTimeoutError` | `expect_all`, `expect_any` |
+| `LambdaInvocableTimeoutError` | `to_be_invocable` (with `entries`) |
 | `DynamoDBNonNumericFieldError` | `to_have_numeric_value_close_to` |
 | `SQSUnexpectedMessageError` | `to_not_have_message` (not a timeout) |
 | `SQSUnexpectedEventError` | `to_not_have_event` (not a timeout) |
+| `LambdaResponseMismatchError` | `to_respond_with` (not a timeout) |
 
 ## Development
 

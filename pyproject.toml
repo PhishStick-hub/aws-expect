@@ -47,4 +47,5 @@ dev = [
     "boto3-stubs[dynamodb,lambda,s3,sqs]>=1.35.0",
     "ty>=0.0.18",
     "ruff>=0.15.2",
+    "vulture>=2.16",
 ]
