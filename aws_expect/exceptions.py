@@ -109,12 +109,12 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         self.timeout = timeout
         self.entries = entries
         self.actual = actual
-        actual_str = repr(actual) if actual is not None else "none"
+        actual_str = repr(actual) if actual is not None else "None"
         if message is not None:
             msg = f"{message}\n\nActual (last seen):\n  {actual_str}"
         elif entries is not None:
             msg = (
-                f"Timed out after {timeout}s waiting for item {key} with entries {entries} in table {table_name}\n\n"
+                f"Timed out after {timeout}s waiting for item {key} in table {table_name}\n\n"
                 f"Expected entries:\n"
                 f"  {entries!r}\n\n"
                 f"Actual (last seen):\n"
@@ -272,11 +272,11 @@ class LambdaInvocableTimeoutError(LambdaWaitTimeoutError):
         self.expected = expected
         self.actual = actual
         self.timeout = timeout
-        actual_str = repr(actual) if actual is not None else "none"
+        actual_str = repr(actual) if actual is not None else "None"
         WaitTimeoutError.__init__(
             self,
             f"Timed out after {timeout}s waiting for Lambda function {function_name!r}"
-            f" to be invocable with entries={expected!r}\n\n"
+            f" to be invocable\n\n"
             f"Expected entries:\n"
             f"  {expected!r}\n\n"
             f"Actual (last seen):\n"
@@ -336,10 +336,9 @@ class SQSWaitTimeoutError(WaitTimeoutError):
         self.body = body
         self.timeout = timeout
         self.actual = actual
-        actual_str = repr(actual) if actual is not None else "none"
+        actual_str = repr(actual) if actual is not None else "None"
         msg = (
-            f"Timed out after {timeout}s waiting for message with body={body!r}"
-            f" in queue {queue_url}\n\n"
+            f"Timed out after {timeout}s waiting for message in queue {queue_url}\n\n"
             f"Expected body:\n"
             f"  {body!r}\n\n"
             f"Actual (last seen):\n"
@@ -392,10 +391,9 @@ class SQSEventWaitTimeoutError(WaitTimeoutError):
         self.event = event
         self.timeout = timeout
         self.actual = actual
-        actual_str = repr(actual) if actual is not None else "none"
+        actual_str = repr(actual) if actual is not None else "None"
         msg = (
-            f"Timed out after {timeout}s waiting for event matching {event!r}"
-            f" in queue {queue_url}\n\n"
+            f"Timed out after {timeout}s waiting for event in queue {queue_url}\n\n"
             f"Expected event:\n"
             f"  {event!r}\n\n"
             f"Actual (last seen):\n"

@@ -40,7 +40,7 @@ class TestSQSToHaveMessage:
         assert exc_info.value.queue_url == sqs_queue.url
         assert "Expected body:" in str(exc_info.value)
         assert "Actual (last seen):" in str(exc_info.value)
-        assert "none" in str(exc_info.value)
+        assert "None" in str(exc_info.value)
 
     def test_raises_timeout_when_wrong_body_present(self, sqs_queue: Queue) -> None:
         sqs_queue.send_message(MessageBody="wrong")
@@ -130,7 +130,7 @@ class TestSQSToConsumeMessage:
         assert exc_info.value.timeout == 2
         assert "Expected body:" in str(exc_info.value)
         assert "Actual (last seen):" in str(exc_info.value)
-        assert "none" in str(exc_info.value)
+        assert "None" in str(exc_info.value)
 
     def test_non_matching_message_restored_and_matching_consumed(
         self, sqs_queue: Queue

@@ -94,7 +94,8 @@ def expect_any(
     Each expectation is a zero-argument callable that performs a wait
     operation. All expectations are submitted to a thread pool and executed
     concurrently. The function returns the result of whichever callable
-    completes successfully first and cancels the remaining callables.
+    completes successfully first. The remaining callables continue running
+    until their own timeouts expire; their results are discarded.
 
     Args:
         expectations: A sequence of zero-argument callables. Each
@@ -134,13 +135,10 @@ def expect_any(
     errors: list[WaitTimeoutError] = []
     results: list[T | None] = [None] * len(expectations)
 
-    future_to_idx: dict[Future[T], int] = {}
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        for idx, expectation in enumerate(expectations):
-            future = executor.submit(expectation)
-            future_to_idx[future] = idx
+        futures = [executor.submit(exp) for exp in expectations]
 
-        for future in as_completed(future_to_idx):
+        for future in as_completed(futures):
             exc = future.exception()
             if exc is None:
                 # First success — return immediately.

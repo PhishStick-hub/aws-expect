@@ -218,8 +218,7 @@ class LambdaFunctionExpectation:
                 )
                 if entries is None or _matches_entries(response_payload, entries):
                     return response_payload
-                if entries is not None:
-                    last_actual = response_payload
+                last_actual = response_payload
             else:
                 response["Payload"].read()  # drain to release the HTTP connection
 

@@ -18,6 +18,24 @@ if TYPE_CHECKING:
     from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 
+def _parse_actual_events(
+    bodies: list[str] | None,
+) -> list[dict[str, Any]] | None:
+    if bodies is None:
+        return None
+    events = [
+        parsed for body in bodies if isinstance(parsed := _try_parse_json(body), dict)
+    ]
+    return events or None
+
+
+def _try_parse_json(body: str) -> Any:
+    try:
+        return json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 class SQSQueueExpectation:
     """Expectation wrapper for a boto3 SQS Queue resource."""
 
@@ -264,20 +282,8 @@ class SQSQueueExpectation:
                     if self._matches_event(message, event):
                         return message
         except SQSWaitTimeoutError as exc:
-            actual_events: list[dict[str, Any]] | None = None
-            if exc.actual is not None:
-                actual_events = []
-                for body in exc.actual:
-                    try:
-                        parsed = json.loads(body)
-                        if isinstance(parsed, dict):
-                            actual_events.append(parsed)
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-                if not actual_events:
-                    actual_events = None
             raise SQSEventWaitTimeoutError(
-                self._queue_url, event, timeout, actual=actual_events
+                self._queue_url, event, timeout, actual=_parse_actual_events(exc.actual)
             ) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
@@ -327,20 +333,8 @@ class SQSQueueExpectation:
                 # No match in this batch — restore all so they stay visible
                 self._restore_messages(messages)
         except SQSWaitTimeoutError as exc:
-            actual_events: list[dict[str, Any]] | None = None
-            if exc.actual is not None:
-                actual_events = []
-                for body in exc.actual:
-                    try:
-                        parsed = json.loads(body)
-                        if isinstance(parsed, dict):
-                            actual_events.append(parsed)
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-                if not actual_events:
-                    actual_events = None
             raise SQSEventWaitTimeoutError(
-                self._queue_url, event, timeout, actual=actual_events
+                self._queue_url, event, timeout, actual=_parse_actual_events(exc.actual)
             ) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
