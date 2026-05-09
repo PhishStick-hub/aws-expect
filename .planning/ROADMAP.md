@@ -68,7 +68,11 @@ Plans:
   3. When the resource already satisfies the success condition, `stop_when` is never checked — the waiter returns success (main-condition-wins ordering)
   4. State dicts passed to predicates are shallow copies — mutations inside the predicate do not affect subsequent poll iterations
   5. Predicate return values are preserved as `stop_reason` in `StopConditionMetError` for debugging context
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Add stop_when parameter, overloads, TypeError guard, and _check_stop_condition helper to S3ObjectExpectation
+- [ ] 07-02-PLAN.md — Write comprehensive integration tests for stop_when predicate (12+ test scenarios)
 
 ### Phase 8: DynamoDB Smart Polling
 **Goal**: DynamoDB polling methods support early abort via `stop_when` predicates, including per-item evaluation during paginated scans
@@ -104,6 +108,6 @@ Plans:
 | 4. Housekeeping + expect_any | v1.2.0 | 2/2 | Complete | 2026-04-28 |
 | 5. Richer Timeout Error Messages | v1.2.0 | 0/3 | Deferred | — |
 | 6. Exception Foundation | v1.3.0 | 0/1 | Planned | — |
-| 7. S3 Smart Polling | v1.3.0 | 0/? | Not started | — |
+| 7. S3 Smart Polling | v1.3.0 | 0/2 | Planned | — |
 | 8. DynamoDB Smart Polling | v1.3.0 | 0/? | Not started | — |
 | 9. Richer Timeout Errors | v1.3.0 | 0/? | Not started | — |
