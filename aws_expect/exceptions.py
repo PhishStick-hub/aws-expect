@@ -13,9 +13,70 @@ class WaitTimeoutError(Exception):
 
     Subclassed per AWS service so callers can catch either the
     service-specific exception or this common base.
+
+    Attributes:
+        timeout: The configured timeout (float).
+        expected: What the waiter expected to find. Defaults to ``None`` for
+            subclasses that don't track expectations.
+        actual: What was actually observed. Defaults to ``None`` for
+            subclasses that don't track actual state.
     """
 
     timeout: float
+    expected: Any = None
+    actual: Any = None
+
+
+class StopConditionMetError(Exception):
+    """Raised when a user-provided stop predicate returns a truthy value.
+
+    Signals that polling should stop immediately because the stop condition
+    was satisfied.  Does **not** inherit :class:`WaitTimeoutError` — this is
+    a deliberate stop, not a timeout.
+
+    Attributes:
+        resource_id: Identifier for the resource being polled
+            (e.g. ``s3://bucket/key``).
+        stop_reason: The string reason returned by the predicate.
+        elapsed: Seconds elapsed since polling started.
+        timeout: The configured timeout (seconds) that was not exceeded.
+    """
+
+    def __init__(
+        self,
+        resource_id: str,
+        stop_reason: str,
+        elapsed: float,
+        timeout: float,
+    ) -> None:
+        self.resource_id = resource_id
+        self.stop_reason = stop_reason
+        self.elapsed = elapsed
+        self.timeout = timeout
+        super().__init__(
+            f"assert stop condition not met for {resource_id!r} after {elapsed:.1f}s "
+            f"of {timeout:.1f}s timeout: {stop_reason!r}"
+        )
+
+
+class StopConditionError(Exception):
+    """Raised when a user-provided stop predicate raises an exception.
+
+    Wraps the original exception via :attr:`__cause__` so callers can
+    inspect the root failure.  Does **not** inherit
+    :class:`WaitTimeoutError`.
+
+    Attributes:
+        resource_id: Identifier for the resource being polled.
+    """
+
+    def __init__(self, resource_id: str, original_exc: Exception) -> None:
+        self.resource_id = resource_id
+        super().__init__(
+            f"Stop predicate for {resource_id!r} raised "
+            f"{type(original_exc).__name__}: {original_exc}"
+        )
+        self.__cause__ = original_exc
 
 
 class S3WaitTimeoutError(WaitTimeoutError):
