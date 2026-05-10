@@ -39,7 +39,11 @@ Plans:
   2. IDE hover shows separate, readable overloaded signatures for all-callable and all-tuple sequences via `@overload` decorators
   3. Docstrings for both `expect_all` and `expect_any` include tuple-form usage examples alongside existing lambda-form examples
   4. Timeout and error handling behave identically for tuple-form and lambda-form expectations — same `AggregateWaitTimeoutError` structure and exception propagation
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Add `@overload` signatures, `ExpectationTuple[T]` alias, and tuple-form docstring examples
+- [ ] 11-02-PLAN.md — Add mixed-sequence tests (`TestExpectAllMixed`, `TestExpectAnyMixed`) with quality gate
 
 ## Progress
 
@@ -49,4 +53,4 @@ Phases execute in numeric order: 10 → 11
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 10. Core Dispatch | v1.4.0 | 0/2 | Planned | - |
-| 11. Type Polish & Docs | v1.4.0 | 0/TBD | Not started | - |
+| 11. Type Polish & Docs | v1.4.0 | 0/2 | Planned | - |
