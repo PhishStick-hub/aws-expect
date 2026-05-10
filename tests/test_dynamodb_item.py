@@ -86,8 +86,8 @@ class TestDynamoDBToExist:
                 poll_interval=1,
             )
 
-        assert "Expected entries:" in str(exc_info.value)
-        assert "Actual (last seen):" in str(exc_info.value)
+        assert "Expected:" in str(exc_info.value)
+        assert "Actual:" in str(exc_info.value)
         assert "pending" in str(exc_info.value)
         assert exc_info.value.actual == {"pk": "order-2", "status": "pending"}
 

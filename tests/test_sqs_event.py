@@ -101,9 +101,8 @@ class TestSQSToHaveEvent:
         assert exc_info.value.event == {"source": "my-app"}
         assert exc_info.value.timeout == 2
         assert exc_info.value.queue_url == sqs_queue.url
-        assert "Expected event:" in str(exc_info.value)
-        assert "Actual (last seen):" in str(exc_info.value)
-        assert "None" in str(exc_info.value)
+        assert "Expected:" in str(exc_info.value)
+        assert "Actual:" not in str(exc_info.value)
 
     def test_raises_timeout_when_wrong_event_present(self, sqs_queue: Queue) -> None:
         _send_event(sqs_queue, {"source": "other-app"})
@@ -115,8 +114,8 @@ class TestSQSToHaveEvent:
                 poll_interval=1,
             )
 
-        assert "Expected event:" in str(exc_info.value)
-        assert "Actual (last seen):" in str(exc_info.value)
+        assert "Expected:" in str(exc_info.value)
+        assert "Actual:" in str(exc_info.value)
         assert "other-app" in str(exc_info.value)
 
     def test_exception_chain_cause_is_sqs_wait_timeout_error(
@@ -143,7 +142,7 @@ class TestSQSToHaveEvent:
                 poll_interval=1,
             )
 
-        assert "Actual (last seen):" in str(exc_info.value)
+        assert "Actual:" in str(exc_info.value)
         assert "other-app" in str(exc_info.value)
 
         messages = sqs_queue.receive_messages(MaxNumberOfMessages=1)
@@ -262,9 +261,8 @@ class TestSQSToConsumeEvent:
 
         assert exc_info.value.event == {"source": "my-app"}
         assert exc_info.value.timeout == 2
-        assert "Expected event:" in str(exc_info.value)
-        assert "Actual (last seen):" in str(exc_info.value)
-        assert "None" in str(exc_info.value)
+        assert "Expected:" in str(exc_info.value)
+        assert "Actual:" not in str(exc_info.value)
 
     def test_succeeds_when_event_appears_mid_poll(self, sqs_queue: Queue) -> None:
         def send_later() -> None:
