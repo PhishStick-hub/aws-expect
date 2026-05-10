@@ -13,7 +13,8 @@ Wait for S3 objects, DynamoDB items/tables, SQS messages/events, and Lambda func
 - **Testing-friendly**: Perfect for integration tests and CI/CD pipelines
 - **Resource-based**: Works with boto3 resource objects (S3, DynamoDB, SQS) and client (Lambda)
 - **Flexible timeouts**: Configure both timeout and poll intervals
-- **Parallel waiting**: `expect_all()` / `expect_any()` run multiple expectations concurrently
+- **Parallel waiting**: `expect_all()` / `expect_any()` run multiple expectations concurrently, accepting both plain callables and `(fn, args, kwargs)` tuples
+- **Zero-boilerplate tuples**: `(fn, args, kwargs)` eliminates `lambda:` wrappers at call sites
 
 ## Installation
 
@@ -200,6 +201,17 @@ result = expect_any([
     lambda: expect_dynamodb_item(table_a).to_exist(key={"pk": "u1"}, timeout=30),
     lambda: expect_dynamodb_item(table_b).to_exist(key={"pk": "u1"}, timeout=30),
 ])
+
+# Tuple form — pass (callable, args, kwargs) to skip lambda: boilerplate
+results = expect_all([
+    (expect_dynamodb_item(table_a).to_exist, ({"pk": "a"}, 30, 1), {}),
+    (expect_dynamodb_item(table_b).to_exist, (), {"key": {"pk": "b"}, "timeout": 30}),
+])
+
+result = expect_any([
+    (expect_dynamodb_item(table_a).to_exist, ({"pk": "u1"}, 30, 1), {}),
+    (expect_dynamodb_item(table_b).to_exist, ({"pk": "u1"}, 30, 1), {}),
+])
 ```
 
 ### Catching Any Timeout
@@ -226,8 +238,8 @@ except WaitTimeoutError:
 | `expect_dynamodb_table(dynamodb, table_name)` | Creates `DynamoDBTableExpectation` |
 | `expect_sqs(queue)` | Creates `SQSQueueExpectation` |
 | `expect_lambda(lambda_client)` | Creates `LambdaFunctionExpectation` |
-| `expect_all(callables)` | Runs expectations concurrently; returns all results or raises |
-| `expect_any(callables)` | Runs expectations concurrently; returns first to succeed |
+| `expect_all(expectations)` | Runs expectations concurrently; accepts callables or `(fn, args, kwargs)` tuples; returns all results or raises |
+| `expect_any(expectations)` | Runs expectations concurrently; accepts callables or `(fn, args, kwargs)` tuples; returns first to succeed |
 
 ### S3 (`S3ObjectExpectation`)
 
