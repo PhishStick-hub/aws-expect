@@ -11,3 +11,6 @@ wheels/
 
 # IDE and editor files
 .opencode/
+
+# Planning artifacts (local only)
+.planning/

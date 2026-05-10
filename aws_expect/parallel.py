@@ -2,15 +2,57 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from typing import TypeVar
+from typing import Any, TypeAlias, TypeVar, cast, overload
 
 from aws_expect.exceptions import AggregateWaitTimeoutError, WaitTimeoutError
 
 T = TypeVar("T")
 
+ExpectationItem: TypeAlias = (
+    Callable[[], T] | tuple[Callable[..., T], tuple, dict[str, Any]]
+)
 
+ExpectationTuple: TypeAlias = tuple[Callable[..., T], tuple, dict[str, Any]]
+
+
+def _submit_expectation(
+    executor: ThreadPoolExecutor,
+    expectation: ExpectationItem[T],
+) -> Future[T]:
+    if isinstance(expectation, tuple):
+        fn = cast(Callable[..., T], expectation[0])
+        args = cast(tuple, expectation[1])
+        kwargs = cast(dict[str, Any], expectation[2])
+        return executor.submit(fn, *args, **kwargs)
+    return executor.submit(expectation)
+
+
+@overload
 def expect_all(
     expectations: Sequence[Callable[[], T]],
+    *,
+    max_workers: int | None = None,
+) -> list[T]: ...
+
+
+@overload
+def expect_all(
+    expectations: Sequence[ExpectationTuple[T]],
+    *,
+    max_workers: int | None = None,
+) -> list[T]: ...
+
+
+@overload
+def expect_all(
+    expectations: Sequence[ExpectationItem[T]],
+    *,
+    max_workers: int | None = None,
+) -> list[T]: ...
+
+
+def expect_all(
+    expectations: Sequence[ExpectationItem[T]],
     *,
     max_workers: int | None = None,
 ) -> list[T]:
@@ -50,6 +92,23 @@ def expect_all(
                 key={"pk": "o1"}, timeout=30,
             ),
         ])
+
+    Example with (callable, args, kwargs) tuples::
+
+        from aws_expect import expect_all, expect_dynamodb_item
+
+        results = expect_all([
+            (
+                expect_dynamodb_item(users).to_exist,
+                ({"pk": "u1"}, 30, 1),
+                {},
+            ),
+            (
+                expect_dynamodb_item(orders).to_exist,
+                (),
+                {"key": {"pk": "o1"}, "timeout": 30, "poll_interval": 1},
+            ),
+        ])
     """
     if not expectations:
         return []
@@ -59,7 +118,7 @@ def expect_all(
     futures: list[Future[T]] = []
     with ThreadPoolExecutor(max_workers=workers) as executor:
         for expectation in expectations:
-            futures.append(executor.submit(expectation))
+            futures.append(_submit_expectation(executor, expectation))
 
         # Wait for all futures to complete (executor.__exit__ does this).
 
@@ -84,8 +143,32 @@ def expect_all(
     return results  # type: ignore[return-value]
 
 
+@overload
 def expect_any(
     expectations: Sequence[Callable[[], T]],
+    *,
+    max_workers: int | None = None,
+) -> T: ...
+
+
+@overload
+def expect_any(
+    expectations: Sequence[ExpectationTuple[T]],
+    *,
+    max_workers: int | None = None,
+) -> T: ...
+
+
+@overload
+def expect_any(
+    expectations: Sequence[ExpectationItem[T]],
+    *,
+    max_workers: int | None = None,
+) -> T: ...
+
+
+def expect_any(
+    expectations: Sequence[ExpectationItem[T]],
     *,
     max_workers: int | None = None,
 ) -> T:
@@ -126,6 +209,23 @@ def expect_any(
                 key={"pk": "u1"}, timeout=30,
             ),
         ])
+
+    Example with (callable, args, kwargs) tuples::
+
+        from aws_expect import expect_any, expect_dynamodb_item
+
+        result = expect_any([
+            (
+                expect_dynamodb_item(table_a).to_exist,
+                ({"pk": "u1"}, 30, 1),
+                {},
+            ),
+            (
+                expect_dynamodb_item(table_b).to_exist,
+                ({"pk": "u1"}, 30, 1),
+                {},
+            ),
+        ])
     """
     if not expectations:
         msg = "expectations must not be empty"
@@ -136,7 +236,7 @@ def expect_any(
     results: list[T | None] = [None] * len(expectations)
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(exp) for exp in expectations]
+        futures = [_submit_expectation(executor, exp) for exp in expectations]
 
         for future in as_completed(futures):
             exc = future.exception()

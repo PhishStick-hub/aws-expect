@@ -181,3 +181,254 @@ class TestExpectAnyFailure:
     def test_empty_list_raises_value_error(self) -> None:
         with pytest.raises(ValueError):
             expect_any([])
+
+
+class TestExpectAnyTupleForm:
+    """Tests for expect_any with (fn, args, kwargs) tuple arguments."""
+
+    def test_single_tuple_succeeds(self, dynamodb_tables: list[Table]) -> None:
+        tables = dynamodb_tables
+        tables[0].put_item(Item={"pk": "any1", "val": "first-success"})
+
+        result: dict[str, Any] = expect_any(
+            [
+                (
+                    expect_dynamodb_item(tables[0]).to_exist,
+                    ({"pk": "any1"}, 10, 1),
+                    {},
+                ),
+            ]
+        )
+
+        assert result["val"] == "first-success"
+
+    def test_first_of_multiple_tuples_succeeds(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
+        tables = dynamodb_tables
+        tables[0].put_item(Item={"pk": "winner", "val": "first"})
+        # tables[1] and tables[2] are empty — will timeout
+
+        result: dict[str, Any] = expect_any(
+            [
+                (
+                    expect_dynamodb_item(tables[0]).to_exist,
+                    ({"pk": "winner"}, 10, 1),
+                    {},
+                ),
+                (
+                    expect_dynamodb_item(tables[1]).to_exist,
+                    ({"pk": "missing-1"}, 2, 1),
+                    {},
+                ),
+                (
+                    expect_dynamodb_item(tables[2]).to_exist,
+                    ({"pk": "missing-2"}, 2, 1),
+                    {},
+                ),
+            ]
+        )
+
+        assert result["val"] == "first"
+
+    def test_tuple_with_kwargs_only_works(self, dynamodb_tables: list[Table]) -> None:
+        tables = dynamodb_tables
+        tables[0].put_item(Item={"pk": "kw-any", "val": "kwargs-win"})
+
+        result: dict[str, Any] = expect_any(
+            [
+                (
+                    expect_dynamodb_item(tables[0]).to_exist,
+                    (),
+                    {"key": {"pk": "kw-any"}, "timeout": 10, "poll_interval": 1},
+                ),
+            ]
+        )
+
+        assert result["val"] == "kwargs-win"
+
+    def test_all_tuples_timeout_raises_aggregate_error(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
+        tables = dynamodb_tables
+
+        with pytest.raises(AggregateWaitTimeoutError) as exc_info:
+            expect_any(
+                [
+                    (
+                        expect_dynamodb_item(tables[0]).to_exist,
+                        ({"pk": "nope-1"}, 2, 1),
+                        {},
+                    ),
+                    (
+                        expect_dynamodb_item(tables[1]).to_exist,
+                        ({"pk": "nope-2"}, 2, 1),
+                        {},
+                    ),
+                    (
+                        expect_dynamodb_item(tables[2]).to_exist,
+                        ({"pk": "nope-3"}, 2, 1),
+                        {},
+                    ),
+                ]
+            )
+
+        err = exc_info.value
+        assert len(err.errors) == 3
+        assert all(r is None for r in err.results)
+
+    def test_tuple_plain_callable_mixed_works(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
+        tables = dynamodb_tables
+        tables[0].put_item(Item={"pk": "mix-win", "val": "mixed"})
+        # tables[1] is empty — will timeout
+
+        result: dict[str, Any] = expect_any(
+            [
+                lambda: expect_dynamodb_item(tables[0]).to_exist(
+                    key={"pk": "mix-win"}, timeout=10, poll_interval=1
+                ),
+                (
+                    expect_dynamodb_item(tables[1]).to_exist,
+                    (
+                        {
+                            "key": {"pk": "missing"},
+                            "timeout": 2,
+                            "poll_interval": 1,
+                        },
+                    ),
+                    {},
+                ),
+            ]
+        )
+
+        assert result["val"] == "mixed"
+
+
+class TestExpectAnyMixed:
+    """Tests for expect_any with mixed (fn, args, kwargs) tuples and plain callables in the same sequence."""
+
+    def test_tuple_first_succeeds(self, dynamodb_tables: list[Table]) -> None:
+        """Tuple at position 0 — it succeeds, result returned."""
+        tables = dynamodb_tables
+        tables[0].put_item(Item={"pk": "t0", "val": "tuple-wins"})
+        # tables[1] empty — will timeout
+
+        result: dict[str, Any] = expect_any(
+            [
+                (
+                    expect_dynamodb_item(tables[0]).to_exist,
+                    ({"pk": "t0"}, 10, 1),
+                    {},
+                ),
+                lambda: expect_dynamodb_item(tables[1]).to_exist(
+                    key={"pk": "missing"}, timeout=2, poll_interval=1
+                ),
+            ]
+        )
+
+        assert result["val"] == "tuple-wins"
+
+    def test_callable_first_succeeds(self, dynamodb_tables: list[Table]) -> None:
+        """Callable at position 0 — it succeeds, result returned."""
+        tables = dynamodb_tables
+        tables[0].put_item(Item={"pk": "c0", "val": "callable-wins"})
+        # tables[1] empty — will timeout
+
+        result: dict[str, Any] = expect_any(
+            [
+                lambda: expect_dynamodb_item(tables[0]).to_exist(
+                    key={"pk": "c0"}, timeout=10, poll_interval=1
+                ),
+                (
+                    expect_dynamodb_item(tables[1]).to_exist,
+                    ({"pk": "missing"}, 2, 1),
+                    {},
+                ),
+            ]
+        )
+
+        assert result["val"] == "callable-wins"
+
+    def test_interleaved_first_tuple_wins(self, dynamodb_tables: list[Table]) -> None:
+        """Sequence [tuple, callable, tuple] — first tuple succeeds, others timeout."""
+        tables = dynamodb_tables
+        tables[0].put_item(Item={"pk": "i0", "val": "first-tuple"})
+        # tables[1] and tables[2] empty — will timeout
+
+        result: dict[str, Any] = expect_any(
+            [
+                (
+                    expect_dynamodb_item(tables[0]).to_exist,
+                    ({"pk": "i0"}, 10, 1),
+                    {},
+                ),
+                lambda: expect_dynamodb_item(tables[1]).to_exist(
+                    key={"pk": "nope-1"}, timeout=2, poll_interval=1
+                ),
+                (
+                    expect_dynamodb_item(tables[2]).to_exist,
+                    ({"pk": "nope-2"}, 2, 1),
+                    {},
+                ),
+            ]
+        )
+
+        assert result["val"] == "first-tuple"
+
+    def test_succeeds_when_any_item_wins_regardless_of_type(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
+        """One item succeeds while others timeout — type doesn't matter."""
+        tables = dynamodb_tables
+        # Only tables[1] (a callable) has data; tables[0] (tuple) and tables[2] (tuple) timeout
+        tables[1].put_item(Item={"pk": "winner", "val": "callable-winner"})
+
+        result: dict[str, Any] = expect_any(
+            [
+                (
+                    expect_dynamodb_item(tables[0]).to_exist,
+                    ({"pk": "nope-0"}, 2, 1),
+                    {},
+                ),
+                lambda: expect_dynamodb_item(tables[1]).to_exist(
+                    key={"pk": "winner"}, timeout=10, poll_interval=1
+                ),
+                (
+                    expect_dynamodb_item(tables[2]).to_exist,
+                    ({"pk": "nope-2"}, 2, 1),
+                    {},
+                ),
+            ]
+        )
+
+        assert result["val"] == "callable-winner"
+
+    def test_all_mixed_all_failures_raises_aggregate_error(
+        self, dynamodb_tables: list[Table]
+    ) -> None:
+        """Every item times out — error aggregation handles mixed types uniformly."""
+        tables = dynamodb_tables
+        # All tables empty — all items will timeout
+
+        with pytest.raises(AggregateWaitTimeoutError) as exc_info:
+            expect_any(
+                [
+                    lambda: expect_dynamodb_item(tables[0]).to_exist(
+                        key={"pk": "nope-0"}, timeout=2, poll_interval=1
+                    ),
+                    (
+                        expect_dynamodb_item(tables[1]).to_exist,
+                        ({"pk": "nope-1"}, 2, 1),
+                        {},
+                    ),
+                    lambda: expect_dynamodb_item(tables[2]).to_exist(
+                        key={"pk": "nope-2"}, timeout=2, poll_interval=1
+                    ),
+                ]
+            )
+
+        err = exc_info.value
+        assert len(err.errors) == 3
+        assert all(r is None for r in err.results)
