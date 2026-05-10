@@ -104,7 +104,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Implement _truncate_value, _format_timeout_error helpers and WaitTimeoutError base class attributes
+- [x] 09-01-PLAN.md — Implement _truncate_value, _format_timeout_error helpers and WaitTimeoutError base class attributes
 - [ ] 09-02-PLAN.md — Update all WaitTimeoutError subclasses, rename call site parameters, extend tests
 
 ## Progress
