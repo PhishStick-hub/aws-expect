@@ -56,6 +56,50 @@ def _deep_matches(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
     return True
 
 
+def _truncate_value(value: Any) -> str:
+    """Format *value* with truncation for error messages.
+
+    Never raises — always returns a string.
+
+    Rules:
+    - ``None`` → ``"None"``
+    - ``list``/``tuple`` with ≤ 50 items → ``repr(value)``
+    - ``list``/``tuple`` with > 50 items → ``repr(first_50)`` +
+      ``"\\n... (N more items not shown)"``
+    - All other types where ``len(repr(value))`` ≤ 500 → ``repr(value)``
+    - All other types where ``len(repr(value))`` > 500 →
+      ``repr(value)[:500]`` +
+      ``"\\n... (value truncated, showing first 500 of NNNN chars)"``
+
+    Args:
+        value: Any value to format for display in an error message.
+
+    Returns:
+        A string representation, possibly truncated.
+    """
+    if value is None:
+        return "None"
+
+    if isinstance(value, (list, tuple)):
+        if len(value) > 50:
+            rendered = repr(
+                list(value[:50]) if isinstance(value, tuple) else value[:50]
+            )
+            remaining = len(value) - 50
+            return f"{rendered}\n... ({remaining} more items not shown)"
+        return repr(value)
+
+    rendered = repr(value)
+    if len(rendered) <= 500:
+        return rendered
+
+    total_len = len(rendered)
+    return (
+        f"{rendered[:500]}\n"
+        f"... (value truncated, showing first 500 of {total_len} chars)"
+    )
+
+
 def _check_stop_condition(
     state: dict[str, Any],
     stop_when: Callable[[dict[str, Any]], bool | str] | None,

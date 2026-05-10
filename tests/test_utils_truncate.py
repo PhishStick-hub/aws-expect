@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from aws_expect._utils import _truncate_value
 
 
@@ -41,7 +39,9 @@ class TestTruncateValue:
         total_len = len(repr(value))
         # Should start with first 500 chars of repr
         assert result.startswith(repr(value)[:500])
-        assert f"... (value truncated, showing first 500 of {total_len} chars)" in result
+        assert (
+            f"... (value truncated, showing first 500 of {total_len} chars)" in result
+        )
 
     def test_tuple_treated_like_list(self) -> None:
         """Tuples follow the same truncation rules as lists."""
