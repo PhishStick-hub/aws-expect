@@ -40,7 +40,7 @@ Phase 5 (Richer Timeout Error Messages) deferred to v1.3.0 — ERR requirements 
 
 - [ ] **Phase 6: Exception Foundation** — `StopConditionMetError` and `StopConditionError` exception classes
 - [ ] **Phase 7: S3 Smart Polling** — `stop_when` predicate on S3 polling methods
-- [ ] **Phase 8: DynamoDB Smart Polling** — `stop_when` predicate on DynamoDB polling methods
+- [ ] **Phase 8: DynamoDB Smart Polling** — `stop_when` predicate on DynamoDB polling methods (3 plans)
 - [ ] **Phase 9: Richer Timeout Errors** — Structured `expected`/`actual` in all `WaitTimeoutError.__str__` output
 
 ## Phase Details
@@ -84,7 +84,12 @@ Plans:
   3. Main-condition-wins ordering is preserved across all DynamoDB polling methods — success is checked before `stop_when` on every iteration
   4. Existing DynamoDB waiters without `stop_when` continue to work identically with no behavioral changes
   5. State dicts document what keys each method provides (e.g., item dict for `to_exist`, `{"item_count": int}` for `to_be_empty`)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Extract _check_stop_condition to _utils.py, update S3 imports
+- [ ] 08-02-PLAN.md — Add stop_when to DynamoDBItemExpectation.to_exist and to_find_item
+- [ ] 08-03-PLAN.md — Write integration tests for DynamoDB stop_when (18 test scenarios)
 
 ### Phase 9: Richer Timeout Errors
 **Goal**: Every timeout failure message shows what was expected and what was actually found, making failures self-documenting without a debugger
@@ -109,5 +114,5 @@ Plans:
 | 5. Richer Timeout Error Messages | v1.2.0 | 0/3 | Deferred | — |
 | 6. Exception Foundation | v1.3.0 | 0/1 | Planned | — |
 | 7. S3 Smart Polling | v1.3.0 | 0/2 | Planned | — |
-| 8. DynamoDB Smart Polling | v1.3.0 | 0/? | Not started | — |
+| 8. DynamoDB Smart Polling | v1.3.0 | 0/3 | Planned | — |
 | 9. Richer Timeout Errors | v1.3.0 | 0/? | Not started | — |

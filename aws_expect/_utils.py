@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any
+import time
+from typing import TYPE_CHECKING, Any, Callable
+
+from aws_expect.exceptions import StopConditionError, StopConditionMetError
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import WaiterConfigTypeDef
@@ -51,3 +54,43 @@ def _deep_matches(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
         elif actual[key] != value:
             return False
     return True
+
+
+def _check_stop_condition(
+    state: dict[str, Any],
+    stop_when: Callable[[dict[str, Any]], bool | str] | None,
+    resource_id: str,
+    start: float,
+    timeout: float,
+) -> dict[str, Any] | None:
+    """Evaluate *stop_when* predicate against a shallow-copied *state* dict.
+
+    Returns:
+        ``None`` when *stop_when* is ``None`` (no-op).
+        ``None`` when predicate returns ``False`` (continue polling).
+
+    Raises:
+        StopConditionMetError: When predicate returns ``True`` or a string.
+        StopConditionError: When predicate raises a non-StopConditionMetError.
+    """
+    if stop_when is None:
+        return None
+
+    state_copy = state.copy()
+    try:
+        result = stop_when(state_copy)
+    except StopConditionMetError:
+        raise
+    except Exception as exc:
+        raise StopConditionError(resource_id, exc) from exc
+
+    if not result:
+        return None
+
+    if isinstance(result, str):
+        stop_reason = result
+    else:
+        stop_reason = "stop condition met"
+
+    elapsed = time.monotonic() - start
+    raise StopConditionMetError(resource_id, stop_reason, elapsed, timeout)
