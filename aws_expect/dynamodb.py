@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import time
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
-from aws_expect._utils import _compute_delay, _deep_matches, _matches_entries
+from aws_expect._utils import _check_stop_condition, _compute_delay, _deep_matches, _matches_entries
 from aws_expect.exceptions import (
     DynamoDBFindItemTimeoutError,
     DynamoDBNonNumericFieldError,
     DynamoDBUnexpectedItemError,
     DynamoDBWaitTimeoutError,
+    StopConditionError,  # noqa: F401 — documented in to_exist/to_find_item Raises
+    StopConditionMetError,  # noqa: F401 — documented in to_exist/to_find_item Raises
 )
 
 if TYPE_CHECKING:
@@ -28,12 +30,30 @@ class DynamoDBItemExpectation:
         self._table = table
         self._table_name: str = table.name
 
+    def _make_resource_id(self, key: dict[str, Any] | None = None) -> str:
+        """Build a resource ID string for StopConditionMetError.
+
+        Per D-12: when *key* is provided, format is
+        ``dynamodb://{table}?pk=val1&sk=val2`` with keys in sorted order.
+        Per D-13: when *key* is None, format is ``dynamodb://{table}``
+        (used by to_find_item which scans all items).
+        """
+        base = f"dynamodb://{self._table_name}"
+        if key is None:
+            return base
+        params = "&".join(
+            f"{k}={v}" for k, v in sorted(key.items())
+        )
+        return f"{base}?{params}"
+
     def to_exist(
         self,
         key: dict[str, Any],
         timeout: float = 30,
         poll_interval: float = 5,
         entries: dict[str, Any] | None = None,
+        *,
+        stop_when: Callable[[dict[str, Any]], bool | str] | None = None,
     ) -> dict[str, Any]:
         """Poll ``get_item`` until the item exists and optionally matches *entries*.
 
@@ -45,6 +65,13 @@ class DynamoDBItemExpectation:
             entries: Optional dict of expected key-value pairs.  When
                 provided the item must contain **at least** these entries
                 (subset match) before the wait succeeds.
+            stop_when: Optional callable that receives a shallow-copied dict of
+                the current DynamoDB item state and can return ``True`` or a
+                string reason to abort polling early via
+                :class:`StopConditionMetError`.  Only evaluated when *item
+                exists* and *entries* don't match — main-condition-wins
+                ordering.  Keyword-only.  Raises :class:`TypeError` if provided
+                without *entries*.
 
         Returns:
             The full item dict from DynamoDB.
@@ -52,9 +79,19 @@ class DynamoDBItemExpectation:
         Raises:
             DynamoDBWaitTimeoutError: If the item does not exist or does
                 not match *entries* within *timeout*.
+            StopConditionMetError: If *stop_when* returns a truthy value.
+            StopConditionError: If *stop_when* raises an exception.
+            TypeError: If *stop_when* is provided without *entries*.
         """
+        if stop_when is not None and entries is None:
+            raise TypeError(
+                "stop_when requires entries to be provided. "
+                "Use to_exist(entries={...}, stop_when=...)"
+            )
+
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
+        start = time.monotonic()
         last_item: dict[str, Any] | None = None
 
         while True:
@@ -64,6 +101,12 @@ class DynamoDBItemExpectation:
             if item is not None:
                 if entries is None or _matches_entries(item, entries):
                     return item
+            # D-02/D-11: stop_when only when item exists and entries don't match
+            if item is not None and stop_when is not None:
+                resource_id = self._make_resource_id(key)
+                _check_stop_condition(
+                    item, stop_when, resource_id, start, timeout
+                )
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise DynamoDBWaitTimeoutError(

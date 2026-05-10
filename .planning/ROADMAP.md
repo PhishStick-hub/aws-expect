@@ -87,7 +87,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Extract _check_stop_condition to _utils.py, update S3 imports
+- [x] 08-01-PLAN.md — Extract _check_stop_condition to _utils.py, update S3 imports
 - [ ] 08-02-PLAN.md — Add stop_when to DynamoDBItemExpectation.to_exist and to_find_item
 - [ ] 08-03-PLAN.md — Write integration tests for DynamoDB stop_when (18 test scenarios)
 
