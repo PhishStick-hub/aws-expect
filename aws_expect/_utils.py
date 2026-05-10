@@ -100,6 +100,50 @@ def _truncate_value(value: Any) -> str:
     )
 
 
+def _format_timeout_error(
+    resource_desc: str,
+    expected: Any,
+    actual: Any,
+    timeout: float,
+) -> str:
+    """Produce a structured timeout error message with Expected:/Actual: sections.
+
+    The function emits a single-line header followed by optional sections
+    showing what was expected and what was actually observed.  Each value
+    is formatted via :func:`_truncate_value`.
+
+    Args:
+        resource_desc: Human-readable description of the waited-on resource
+            (e.g. ``"s3://bucket/key"``, ``"table my-table"``).
+        expected: What the waiter expected to find, or ``None``.
+        actual: What was actually observed, or ``None``.
+        timeout: The timeout in seconds.
+
+    Returns:
+        A multi-line string suitable as the ``args`` for ``Exception()``.
+    """
+    lines: list[str] = [
+        f"Timed out after {timeout}s waiting for {resource_desc}",
+    ]
+
+    if expected is None and actual is None:
+        return lines[0]
+
+    lines.append("")
+    sections: list[str] = []
+
+    if expected is not None:
+        sections.append(f"Expected:\n  {_truncate_value(expected)}")
+
+    if actual is not None:
+        if sections:
+            sections.append("")
+        sections.append(f"Actual:\n  {_truncate_value(actual)}")
+
+    lines.extend(sections)
+    return "\n".join(lines)
+
+
 def _check_stop_condition(
     state: dict[str, Any],
     stop_when: Callable[[dict[str, Any]], bool | str] | None,
