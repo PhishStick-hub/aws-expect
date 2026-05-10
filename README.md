@@ -1,16 +1,19 @@
 # AWS Expect
 
 Declarative, Pythonic waiters for AWS services using boto3.
-Wait for S3 objects, DynamoDB items/tables, SQS messages/events, and Lambda functions to reach an expected state — with optional content matching and parallel execution via `expect_all`.
+Wait for S3 objects, DynamoDB items/tables, SQS messages/events, and Lambda functions to reach an expected state — with content matching, `stop_when` predicates for early abort, structured `Expected:`/`Actual:` error messages, and parallel execution via `expect_all` / `expect_any`.
 
 ## Features
 
 - **Declarative syntax**: `expect_s3(obj).to_exist(timeout=30)`
+- **Content matching**: Wait for S3 body JSON or DynamoDB item attributes to match expected values
+- **Smart polling**: `stop_when` predicates abort early when further polling is pointless
+- **Richer errors**: Structured `Expected:`/`Actual:` sections in timeout error messages
 - **Native boto3 waiters**: Uses AWS's built-in waiter infrastructure where available
 - **Testing-friendly**: Perfect for integration tests and CI/CD pipelines
 - **Resource-based**: Works with boto3 resource objects (S3, DynamoDB, SQS) and client (Lambda)
 - **Flexible timeouts**: Configure both timeout and poll intervals
-- **Parallel waiting**: `expect_all()` runs multiple expectations concurrently
+- **Parallel waiting**: `expect_all()` / `expect_any()` run multiple expectations concurrently
 
 ## Installation
 
@@ -39,6 +42,25 @@ metadata = expect_s3(obj).to_exist(timeout=30, poll_interval=5)
 print(f"Object exists! Size: {metadata['ContentLength']} bytes")
 
 expect_s3(obj).to_not_exist(timeout=10, poll_interval=2)
+
+# Wait for object body to be valid JSON that deep-matches expected content
+from aws_expect import S3ContentWaitTimeoutError
+
+body = expect_s3(obj).to_have_content({"status": "shipped"}, timeout=30)
+
+# Assert object body does NOT match after a delay
+from aws_expect import S3UnexpectedContentError
+
+expect_s3(obj).to_not_have_content({"status": "cancelled"}, delay=5)
+
+# Abort early with stop_when predicate
+from aws_expect import StopConditionMetError
+
+body = expect_s3(obj).to_exist(
+    entries={"status": "shipped"},
+    stop_when=lambda state: state.get("status") == "cancelled",
+    timeout=60,
+)
 ```
 
 ### DynamoDB Item Waiting
@@ -58,6 +80,26 @@ item = expect_dynamodb_item(table).to_exist(
 )
 
 expect_dynamodb_item(table).to_not_exist(key={"pk": "order-123"}, timeout=10)
+
+# Scan table for an item matching entries
+from aws_expect import DynamoDBFindItemTimeoutError
+
+item = expect_dynamodb_item(table).to_find_item(
+    entries={"status": "pending"},
+    timeout=30,
+)
+
+# Assert no matching item exists after a delay
+from aws_expect import DynamoDBUnexpectedItemError
+
+expect_dynamodb_item(table).to_not_find_item({"status": "cancelled"}, delay=5)
+
+# Abort scan early with stop_when predicate
+item = expect_dynamodb_item(table).to_find_item(
+    entries={"status": "pending"},
+    stop_when=lambda item: item.get("status") == "failed",
+    timeout=60,
+)
 ```
 
 ### DynamoDB Table Waiting
@@ -191,18 +233,22 @@ except WaitTimeoutError:
 
 | Method | Description |
 |--------|-------------|
-| `to_exist(timeout, poll_interval, entries)` | Wait for object to exist; optionally match metadata entries |
+| `to_exist(timeout, poll_interval, entries, *, stop_when)` | Wait for object to exist; optionally match metadata entries and abort early via `stop_when` |
 | `to_not_exist(timeout, poll_interval)` | Wait for object to be deleted |
+| `to_have_content(entries, timeout, poll_interval)` | Wait until object body is valid JSON deep-matching `entries` |
+| `to_not_have_content(entries, delay)` | Assert object body does not deep-match `entries` after `delay` |
 
 ### DynamoDB Item (`DynamoDBItemExpectation`)
 
 | Method | Description |
 |--------|-------------|
-| `to_exist(key, timeout, poll_interval, entries)` | Wait for item to exist; optionally match attribute entries |
+| `to_exist(key, timeout, poll_interval, entries, *, stop_when)` | Wait for item to exist; optionally match attribute entries and abort early via `stop_when` |
 | `to_not_exist(key, timeout, poll_interval)` | Wait for item to be deleted |
 | `to_be_empty(timeout, poll_interval)` | Wait for table to have no items |
 | `to_be_not_empty(timeout, poll_interval)` | Wait for table to have at least one item |
 | `to_have_numeric_value_close_to(key, field, value, delta, timeout, poll_interval)` | Wait for a numeric field to be within delta of value |
+| `to_find_item(entries, timeout, poll_interval, *, stop_when)` | Scan table until at least one item subset-matches `entries`; abort via `stop_when` |
+| `to_not_find_item(entries, delay)` | Assert no item matches `entries` after `delay` |
 
 ### DynamoDB Table (`DynamoDBTableExpectation`)
 
@@ -239,17 +285,23 @@ All timeout exceptions inherit from `WaitTimeoutError`:
 
 | Exception | Raised by |
 |-----------|-----------|
-| `S3WaitTimeoutError` | S3 methods |
+| `S3WaitTimeoutError` | S3 existence methods |
+| `S3ContentWaitTimeoutError` | `to_have_content` |
+| `S3UnexpectedContentError` | `to_not_have_content` (not a timeout) |
 | `DynamoDBWaitTimeoutError` | DynamoDB methods |
+| `DynamoDBFindItemTimeoutError` | `to_find_item` |
+| `DynamoDBUnexpectedItemError` | `to_not_find_item` (not a timeout) |
+| `DynamoDBNonNumericFieldError` | `to_have_numeric_value_close_to` (not a timeout) |
 | `SQSWaitTimeoutError` | SQS string-body methods |
 | `SQSEventWaitTimeoutError` | SQS JSON event methods |
-| `LambdaWaitTimeoutError` | Lambda methods |
-| `AggregateWaitTimeoutError` | `expect_all`, `expect_any` |
-| `LambdaInvocableTimeoutError` | `to_be_invocable` (with `entries`) |
-| `DynamoDBNonNumericFieldError` | `to_have_numeric_value_close_to` |
 | `SQSUnexpectedMessageError` | `to_not_have_message` (not a timeout) |
 | `SQSUnexpectedEventError` | `to_not_have_event` (not a timeout) |
+| `LambdaWaitTimeoutError` | Lambda methods |
+| `LambdaInvocableTimeoutError` | `to_be_invocable` (with `entries`) |
 | `LambdaResponseMismatchError` | `to_respond_with` (not a timeout) |
+| `StopConditionMetError` | `stop_when` predicate returns `True` (not a timeout) |
+| `StopConditionError` | `stop_when` predicate raises an exception (not a timeout) |
+| `AggregateWaitTimeoutError` | `expect_all`, `expect_any` |
 
 ## Development
 

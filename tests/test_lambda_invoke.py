@@ -54,8 +54,8 @@ class TestToBeInvocable:
             )
         assert exc_info.value.function_name == lambda_function
         assert exc_info.value.timeout == 2
-        assert "Expected entries:" in str(exc_info.value)
-        assert "Actual (last seen):" in str(exc_info.value)
+        assert "Expected:" in str(exc_info.value)
+        assert "Actual:" in str(exc_info.value)
         assert exc_info.value.expected == {"statusCode": 999}
         assert isinstance(exc_info.value.actual, dict)
 

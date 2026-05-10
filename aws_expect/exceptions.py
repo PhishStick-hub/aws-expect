@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from aws_expect._utils import _format_timeout_error
+
 NON_NUMERIC_FIELD_MSG = (
     "Field '{field}' has non-numeric value {value!r}"
     " (type {type}) for item {key} in table {table_name}"
@@ -13,9 +15,70 @@ class WaitTimeoutError(Exception):
 
     Subclassed per AWS service so callers can catch either the
     service-specific exception or this common base.
+
+    Attributes:
+        timeout: The configured timeout (float).
+        expected: What the waiter expected to find. Defaults to ``None`` for
+            subclasses that don't track expectations.
+        actual: What was actually observed. Defaults to ``None`` for
+            subclasses that don't track actual state.
     """
 
     timeout: float
+    expected: Any = None
+    actual: Any = None
+
+
+class StopConditionMetError(Exception):
+    """Raised when a user-provided stop predicate returns a truthy value.
+
+    Signals that polling should stop immediately because the stop condition
+    was satisfied.  Does **not** inherit :class:`WaitTimeoutError` — this is
+    a deliberate stop, not a timeout.
+
+    Attributes:
+        resource_id: Identifier for the resource being polled
+            (e.g. ``s3://bucket/key``).
+        stop_reason: The string reason returned by the predicate.
+        elapsed: Seconds elapsed since polling started.
+        timeout: The configured timeout (seconds) that was not exceeded.
+    """
+
+    def __init__(
+        self,
+        resource_id: str,
+        stop_reason: str,
+        elapsed: float,
+        timeout: float,
+    ) -> None:
+        self.resource_id = resource_id
+        self.stop_reason = stop_reason
+        self.elapsed = elapsed
+        self.timeout = timeout
+        super().__init__(
+            f"assert stop condition not met for {resource_id!r} after {elapsed:.1f}s "
+            f"of {timeout:.1f}s timeout: {stop_reason!r}"
+        )
+
+
+class StopConditionError(Exception):
+    """Raised when a user-provided stop predicate raises an exception.
+
+    Wraps the original exception via :attr:`__cause__` so callers can
+    inspect the root failure.  Does **not** inherit
+    :class:`WaitTimeoutError`.
+
+    Attributes:
+        resource_id: Identifier for the resource being polled.
+    """
+
+    def __init__(self, resource_id: str, original_exc: Exception) -> None:
+        self.resource_id = resource_id
+        super().__init__(
+            f"Stop predicate for {resource_id!r} raised "
+            f"{type(original_exc).__name__}: {original_exc}"
+        )
+        self.__cause__ = original_exc
 
 
 class S3WaitTimeoutError(WaitTimeoutError):
@@ -25,7 +88,9 @@ class S3WaitTimeoutError(WaitTimeoutError):
         self.bucket = bucket
         self.key = key
         self.timeout = timeout
-        super().__init__(f"Timed out after {timeout}s waiting for s3://{bucket}/{key}")
+        super().__init__(
+            _format_timeout_error(f"s3://{bucket}/{key}", None, None, timeout)
+        )
 
 
 class S3ContentWaitTimeoutError(S3WaitTimeoutError):
@@ -58,8 +123,12 @@ class S3ContentWaitTimeoutError(S3WaitTimeoutError):
         self.timeout = timeout
         WaitTimeoutError.__init__(
             self,
-            f"Timed out after {timeout}s waiting for s3://{bucket}/{key}"
-            f" to have content matching expected={expected!r}; last body: {actual!r}",
+            _format_timeout_error(
+                f"s3://{bucket}/{key} to have matching content",
+                expected,
+                actual,
+                timeout,
+            ),
         )
 
 
@@ -101,27 +170,23 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         key: dict[str, str] | None,
         timeout: float,
         message: str | None = None,
-        entries: dict[str, Any] | None = None,
+        expected: dict[str, Any] | None = None,
         actual: dict[str, Any] | None = None,
     ) -> None:
         self.table_name = table_name
         self.key = key
         self.timeout = timeout
-        self.entries = entries
+        self.expected = expected
+        self.entries = expected  # deprecated, use .expected
         self.actual = actual
-        actual_str = repr(actual) if actual is not None else "None"
         if message is not None:
-            msg = f"{message}\n\nActual (last seen):\n  {actual_str}"
-        elif entries is not None:
-            msg = (
-                f"Timed out after {timeout}s waiting for item {key} in table {table_name}\n\n"
-                f"Expected entries:\n"
-                f"  {entries!r}\n\n"
-                f"Actual (last seen):\n"
-                f"  {actual_str}"
-            )
+            actual_fmt = repr(actual) if actual is not None else "None"
+            msg = f"{message}\n\nActual (last seen):\n  {actual_fmt}"
         else:
-            msg = f"Timed out after {timeout}s waiting for item {key} in table {table_name}"
+            resource_desc = (
+                f"item {key} in table {table_name}" if key else f"table {table_name}"
+            )
+            msg = _format_timeout_error(resource_desc, expected, actual, timeout)
         super().__init__(msg)
 
 
@@ -155,13 +220,15 @@ class DynamoDBFindItemTimeoutError(DynamoDBWaitTimeoutError):
         # would set, so that callers catching as DynamoDBWaitTimeoutError can
         # safely access .key and .entries without AttributeError.
         self.key = None
-        self.entries = None
-        item_count = len(actual) if actual is not None else 0
+        self.entries = expected  # deprecated, use .expected
         WaitTimeoutError.__init__(
             self,
-            f"Timed out after {timeout}s waiting for an item matching {expected!r}"
-            f" in table {table_name};"
-            f" last scan returned {item_count} item(s): {actual!r}",
+            _format_timeout_error(
+                f"an item matching {expected!r} in table {table_name}",
+                expected,
+                actual,
+                timeout,
+            ),
         )
 
 
@@ -246,7 +313,9 @@ class LambdaWaitTimeoutError(WaitTimeoutError):
         self.function_name = function_name
         self.timeout = timeout
         super().__init__(
-            f"Timed out after {timeout}s waiting for Lambda function {function_name!r}"
+            _format_timeout_error(
+                f"Lambda function {function_name!r}", None, None, timeout
+            )
         )
 
 
@@ -272,15 +341,14 @@ class LambdaInvocableTimeoutError(LambdaWaitTimeoutError):
         self.expected = expected
         self.actual = actual
         self.timeout = timeout
-        actual_str = repr(actual) if actual is not None else "None"
         WaitTimeoutError.__init__(
             self,
-            f"Timed out after {timeout}s waiting for Lambda function {function_name!r}"
-            f" to be invocable\n\n"
-            f"Expected entries:\n"
-            f"  {expected!r}\n\n"
-            f"Actual (last seen):\n"
-            f"  {actual_str}",
+            _format_timeout_error(
+                f"Lambda function {function_name!r} to be invocable",
+                expected,
+                actual,
+                timeout,
+            ),
         )
 
 
@@ -328,21 +396,20 @@ class SQSWaitTimeoutError(WaitTimeoutError):
     def __init__(
         self,
         queue_url: str,
-        body: str,
+        expected: str,
         timeout: float,
         actual: list[str] | None = None,
     ) -> None:
         self.queue_url = queue_url
-        self.body = body
+        self.expected = expected
+        self.body = expected  # deprecated, use .expected
         self.timeout = timeout
         self.actual = actual
-        actual_str = repr(actual) if actual is not None else "None"
-        msg = (
-            f"Timed out after {timeout}s waiting for message in queue {queue_url}\n\n"
-            f"Expected body:\n"
-            f"  {body!r}\n\n"
-            f"Actual (last seen):\n"
-            f"  {actual_str}"
+        msg = _format_timeout_error(
+            f"message in queue {queue_url}",
+            expected,
+            actual,
+            timeout,
         )
         super().__init__(msg)
 
@@ -370,34 +437,34 @@ class SQSEventWaitTimeoutError(WaitTimeoutError):
     """Raised when to_have_event / to_consume_event exceeds timeout.
 
     Inherits WaitTimeoutError directly (not SQSWaitTimeoutError) because
-    it stores event: dict[str, Any] rather than body: str. Callers that
+    it stores expected: dict[str, Any] rather than body: str. Callers that
     catch SQSWaitTimeoutError will NOT catch this exception; they must
     catch SQSEventWaitTimeoutError or the common base WaitTimeoutError.
 
     Attributes:
         queue_url: URL of the SQS queue that was polled.
-        event: The event subset dict that was not found.
+        expected: The event subset dict that was not found (canonical name).
+        event: Deprecated alias for *expected*.
         timeout: The timeout that was configured for the wait.
     """
 
     def __init__(
         self,
         queue_url: str,
-        event: dict[str, Any],
+        expected: dict[str, Any],
         timeout: float,
         actual: list[dict[str, Any]] | None = None,
     ) -> None:
         self.queue_url = queue_url
-        self.event = event
+        self.expected = expected
+        self.event = expected  # deprecated, use .expected
         self.timeout = timeout
         self.actual = actual
-        actual_str = repr(actual) if actual is not None else "None"
-        msg = (
-            f"Timed out after {timeout}s waiting for event in queue {queue_url}\n\n"
-            f"Expected event:\n"
-            f"  {event!r}\n\n"
-            f"Actual (last seen):\n"
-            f"  {actual_str}"
+        msg = _format_timeout_error(
+            f"event in queue {queue_url}",
+            expected,
+            actual,
+            timeout,
         )
         super().__init__(msg)
 
