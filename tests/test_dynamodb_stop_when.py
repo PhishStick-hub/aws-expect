@@ -47,9 +47,7 @@ class TestToExistStopWhen:
             )
         assert exc_info.value.stop_reason == "status is failed"
 
-    def test_stop_when_none_is_backward_compatible(
-        self, dynamodb_table: Table
-    ) -> None:
+    def test_stop_when_none_is_backward_compatible(self, dynamodb_table: Table) -> None:
         dynamodb_table.put_item(Item={"pk": "item-3", "status": "active"})
         result = expect_dynamodb_item(dynamodb_table).to_exist(
             key={"pk": "item-3"},
@@ -89,7 +87,7 @@ class TestToExistStopWhen:
                 10,
                 1,
                 {"status": "ok"},
-                lambda s: True,
+                lambda s: True,  # type: ignore[too-many-positional-arguments] — intentional: tests keyword-only enforcement
             )
         assert "positional argument" in str(exc_info.value)
 
@@ -112,9 +110,7 @@ class TestToExistStopWhen:
         finally:
             timer.cancel()
 
-    def test_stop_when_state_dict_is_shallow_copy(
-        self, dynamodb_table: Table
-    ) -> None:
+    def test_stop_when_state_dict_is_shallow_copy(self, dynamodb_table: Table) -> None:
         called: list[bool] = []
 
         def mutating_predicate(state: dict) -> bool:
@@ -186,14 +182,10 @@ class TestToExistStopWhen:
                 timeout=5,
                 poll_interval=1,
             )
-        expected = (
-            f"dynamodb://{dynamodb_composite_table.name}?pk=user-1&sk=2024-01-01"
-        )
+        expected = f"dynamodb://{dynamodb_composite_table.name}?pk=user-1&sk=2024-01-01"
         assert exc_info.value.resource_id == expected
 
-    def test_main_condition_wins_after_update(
-        self, dynamodb_table: Table
-    ) -> None:
+    def test_main_condition_wins_after_update(self, dynamodb_table: Table) -> None:
         # Item does NOT exist initially — D-02: stop_when skipped when
         # item is None. Timer creates the item with matching entries,
         # so on the next poll the entries check returns success before
@@ -302,14 +294,13 @@ class TestToFindItemStopWhen:
         # Items 1–5, where item "3" triggers stop_when
         for i in range(1, 6):
             status = "abort" if i == 3 else "ok"
-            dynamodb_table.put_item(
-                Item={"pk": str(i), "status": status}
-            )
+            dynamodb_table.put_item(Item={"pk": str(i), "status": status})
         with pytest.raises(StopConditionMetError):
             expect_dynamodb_item(dynamodb_table).to_find_item(
                 entries={"status": "target"},
-                stop_when=lambda s: scanned.append(s["pk"])
-                or s.get("status") == "abort",
+                stop_when=lambda s: (
+                    scanned.append(s["pk"]) or s.get("status") == "abort"
+                ),
                 timeout=5,
                 poll_interval=1,
             )
@@ -317,9 +308,7 @@ class TestToFindItemStopWhen:
         assert len(scanned) <= 3
         assert "3" in scanned
 
-    def test_stop_when_none_no_behavior_change(
-        self, dynamodb_table: Table
-    ) -> None:
+    def test_stop_when_none_no_behavior_change(self, dynamodb_table: Table) -> None:
         dynamodb_table.put_item(Item={"pk": "compat", "status": "found"})
         result = expect_dynamodb_item(dynamodb_table).to_find_item(
             entries={"status": "found"},
@@ -338,9 +327,7 @@ class TestToFindItemStopWhen:
         assert result2["pk"] == "compat"
         assert result2["status"] == "found"
 
-    def test_stop_when_state_dict_is_shallow_copy(
-        self, dynamodb_table: Table
-    ) -> None:
+    def test_stop_when_state_dict_is_shallow_copy(self, dynamodb_table: Table) -> None:
         called: list[bool] = []
 
         def mutating_predicate(state: dict) -> bool:
