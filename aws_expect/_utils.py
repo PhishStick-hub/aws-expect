@@ -4,8 +4,6 @@ import math
 import time
 from typing import TYPE_CHECKING, Any, Callable
 
-from aws_expect.exceptions import StopConditionError, StopConditionMetError
-
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import WaiterConfigTypeDef
 
@@ -161,6 +159,8 @@ def _check_stop_condition(
         StopConditionMetError: When predicate returns ``True`` or a string.
         StopConditionError: When predicate raises a non-StopConditionMetError.
     """
+    # Lazy import to break circular dependency with exceptions.py
+    from aws_expect.exceptions import StopConditionError, StopConditionMetError  # noqa: PLC0415
     if stop_when is None:
         return None
 
