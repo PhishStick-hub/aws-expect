@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import time
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any, Callable, overload
 
 from botocore.exceptions import ClientError, WaiterError
 
 from aws_expect._utils import (
     _build_waiter_config,
+    _check_stop_condition,
     _compute_delay,
     _deep_matches,
     _matches_entries,
@@ -47,11 +48,23 @@ class S3ObjectExpectation:
         entries: None = ...,
     ) -> HeadObjectOutputTypeDef: ...
 
+    @overload
+    def to_exist(
+        self,
+        timeout: float = ...,
+        poll_interval: float = ...,
+        entries: dict[str, Any] = ...,
+        *,
+        stop_when: Callable[[dict[str, Any]], bool | str] | None = ...,
+    ) -> dict[str, Any]: ...
+
     def to_exist(
         self,
         timeout: float = 30,
         poll_interval: float = 5,
         entries: dict[str, Any] | None = None,
+        *,
+        stop_when: Callable[[dict[str, Any]], bool | str] | None = None,
     ) -> HeadObjectOutputTypeDef | dict[str, Any]:
         """Wait for the S3 object to exist and optionally match *entries*.
 
@@ -73,6 +86,12 @@ class S3ObjectExpectation:
                 entries with equal values (**shallow** match — nested dicts must
                 match exactly, not as a subset). Use :meth:`to_have_content` for
                 deep recursive subset matching.
+            stop_when: Optional callable that receives a shallow-copied dict of
+                the current resource state and can return ``True`` or a string
+                reason to abort polling early via :class:`StopConditionMetError`.
+                Only evaluated when *entries* don't match — main-condition-wins
+                ordering. Keyword-only. Raises :class:`TypeError` if provided
+                without *entries*.
 
         Returns:
             The ``head_object`` response metadata dict when *entries* is
@@ -81,9 +100,17 @@ class S3ObjectExpectation:
         Raises:
             S3WaitTimeoutError: If the object does not exist (or does not
                 match *entries*) within *timeout*.
+            StopConditionMetError: If *stop_when* returns a truthy value.
+            StopConditionError: If *stop_when* raises an exception.
+            TypeError: If *stop_when* is provided without *entries*.
         """
+        if stop_when is not None and entries is None:
+            raise TypeError(
+                "stop_when requires entries to be provided. "
+                "Use to_exist(entries={...}, stop_when=...)"
+            )
         if entries is not None:
-            return self._poll_for_entries(timeout, poll_interval, entries)
+            return self._poll_for_entries(timeout, poll_interval, entries, stop_when)
 
         waiter_config = _build_waiter_config(timeout, poll_interval)
         try:
@@ -119,15 +146,27 @@ class S3ObjectExpectation:
         timeout: float,
         poll_interval: float,
         entries: dict[str, Any],
+        stop_when: Callable[[dict[str, Any]], bool | str] | None = None,
     ) -> dict[str, Any]:
-        """Poll ``get_object``, parse JSON, and wait for a subset match."""
+        """Poll ``get_object``, parse JSON, and wait for a subset match.
+
+        Args:
+            stop_when: Optional callable evaluated after entries mismatch.
+                Receives a shallow-copied state dict. Returns ``True`` or a
+                string reason to abort polling early via StopConditionMetError.
+        """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
+        start = time.monotonic()
 
         while True:
             body = self._fetch_body()
             if body is not None and _matches_entries(body, entries):
                 return body
+
+            if body is not None and stop_when is not None:
+                resource_id = f"s3://{self._bucket}/{self._key}"
+                _check_stop_condition(body, stop_when, resource_id, start, timeout)
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
