@@ -24,7 +24,11 @@ Milestone v1.4.0 enhances `expect_all` and `expect_any` to accept `(callable, ar
   2. User can pass `(fn, args, kwargs)` tuples to `expect_any` — the first success is returned; all-failure raises `AggregateWaitTimeoutError` with `results` list containing `None` for failures
   3. Empty sequences behave identically to current behavior: `expect_all([])` returns `[]`, `expect_any([])` raises `ValueError`
   4. `ExpectationItem[T]` type alias is defined in `parallel.py` and used in `expect_all` / `expect_any` function signatures
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Add `ExpectationItem[T]` type alias, `_submit_expectation` helper, and update `expect_all`/`expect_any` dispatch
+- [ ] 10-02-PLAN.md — Tuple-form tests for `expect_all` and `expect_any`, full suite verification
 
 ### Phase 11: Type Polish, Edge Testing, Docs
 **Goal**: Users get clean IDE hover information, mixed sequences of tuples and callables work seamlessly, and docstrings show tuple-form usage examples.
@@ -44,5 +48,5 @@ Phases execute in numeric order: 10 → 11
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 10. Core Dispatch | v1.4.0 | 0/TBD | Not started | - |
+| 10. Core Dispatch | v1.4.0 | 0/2 | Planned | - |
 | 11. Type Polish & Docs | v1.4.0 | 0/TBD | Not started | - |
