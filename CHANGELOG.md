@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.4.0](https://github.com/PhishStick-hub/aws-expect/compare/v1.3.0...v1.4.0) (2026-05-10)
+
+
+### Features
+
+* **parallel:** support (fn, args, kwargs) tuples in expect_all and expect_any ([78f8c25](https://github.com/PhishStick-hub/aws-expect/commit/78f8c25df9b44aac0b7e8ebd24d69aa42ed1ec10))
+
+
+### Documentation
+
+* **10:** capture phase context for Core Dispatch Implementation ([d45a4c2](https://github.com/PhishStick-hub/aws-expect/commit/d45a4c2a3b8dc738b68bb2daf72a387467a25ff7))
+* **10:** research and plan phase 10 — core dispatch implementation ([25daec3](https://github.com/PhishStick-hub/aws-expect/commit/25daec30f8f6edadbd2c915251d7e62ba5993e9f))
+* **11:** capture phase context ([c1c52f9](https://github.com/PhishStick-hub/aws-expect/commit/c1c52f95a13d304fbc775c2d106e3ced85453c9c))
+* **11:** create phase plan — type polish, edge testing, docs ([0cd190a](https://github.com/PhishStick-hub/aws-expect/commit/0cd190a54731f6e71b0903aa93628737de675cde))
+* create milestone v1.4.0 roadmap (2 phases) ([7420471](https://github.com/PhishStick-hub/aws-expect/commit/74204710eb1bb61311b088daaa9c9fff5fd97817))
+* define milestone v1.4.0 requirements ([46053bc](https://github.com/PhishStick-hub/aws-expect/commit/46053bc10d24dd121d9be8901a389a17e2d9724f))
+* **readme:** add tuple-form examples for expect_all and expect_any ([6b954d0](https://github.com/PhishStick-hub/aws-expect/commit/6b954d0d6343d7b053e12d082c29e6a583856e91))
+* **research:** synthesize project research for v1.4.0 lambda-args ([9f9ebed](https://github.com/PhishStick-hub/aws-expect/commit/9f9ebed430ccac5941a4705b17d6e05b3f73db24))
+* start milestone v1.4.0 Lambda Args for expect_all / expect_any ([ac72b5e](https://github.com/PhishStick-hub/aws-expect/commit/ac72b5ed961e06dcbac486989a84aa5be4e75e5f))
+* **state:** record phase 10 context session ([24b7550](https://github.com/PhishStick-hub/aws-expect/commit/24b7550ca5325f32cc88757603724f6017140ca4))
+* **state:** record phase 11 context session ([f75eb09](https://github.com/PhishStick-hub/aws-expect/commit/f75eb0936dfd44d6e065315f4a5a24109e699e52))
+
 ## [1.3.0](https://github.com/PhishStick-hub/aws-expect/compare/v1.2.0...v1.3.0) (2026-05-10)
 
 
