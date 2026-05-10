@@ -44,12 +44,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PAR-01 | Phase 1 | Pending |
-| PAR-02 | Phase 1 | Pending |
-| PAR-03 | Phase 2 | Pending |
-| PAR-04 | Phase 1 | Pending |
-| PAR-05 | Phase 2 | Pending |
-| PAR-06 | Phase 2 | Pending |
+| PAR-01 | Phase 10 | Pending |
+| PAR-02 | Phase 10 | Pending |
+| PAR-03 | Phase 11 | Pending |
+| PAR-04 | Phase 10 | Pending |
+| PAR-05 | Phase 11 | Pending |
+| PAR-06 | Phase 11 | Pending |
 
 **Coverage:**
 - v1.4.0 requirements: 6 total
@@ -58,4 +58,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-10*
-*Last updated: 2026-05-10 after initial definition*
+*Last updated: 2026-05-10 after roadmap creation*
