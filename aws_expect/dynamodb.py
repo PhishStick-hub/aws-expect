@@ -4,7 +4,12 @@ import time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Callable, Iterator
 
-from aws_expect._utils import _check_stop_condition, _compute_delay, _deep_matches, _matches_entries
+from aws_expect._utils import (
+    _check_stop_condition,
+    _compute_delay,
+    _deep_matches,
+    _matches_entries,
+)
 from aws_expect.exceptions import (
     DynamoDBFindItemTimeoutError,
     DynamoDBNonNumericFieldError,
@@ -41,9 +46,7 @@ class DynamoDBItemExpectation:
         base = f"dynamodb://{self._table_name}"
         if key is None:
             return base
-        params = "&".join(
-            f"{k}={v}" for k, v in sorted(key.items())
-        )
+        params = "&".join(f"{k}={v}" for k, v in sorted(key.items()))
         return f"{base}?{params}"
 
     def to_exist(
@@ -104,9 +107,7 @@ class DynamoDBItemExpectation:
             # D-02/D-11: stop_when only when item exists and entries don't match
             if item is not None and stop_when is not None:
                 resource_id = self._make_resource_id(key)
-                _check_stop_condition(
-                    item, stop_when, resource_id, start, timeout
-                )
+                _check_stop_condition(item, stop_when, resource_id, start, timeout)
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise DynamoDBWaitTimeoutError(
@@ -273,6 +274,8 @@ class DynamoDBItemExpectation:
         entries: dict[str, Any],
         timeout: float = 30,
         poll_interval: float = 5,
+        *,
+        stop_when: Callable[[dict[str, Any]], bool | str] | None = None,
     ) -> dict[str, Any]:
         """Scan the table until at least one item deep-matches *entries*.
 
@@ -288,6 +291,12 @@ class DynamoDBItemExpectation:
                 contain at least those key-value pairs.
             timeout: Maximum seconds to wait.
             poll_interval: Seconds between polls (minimum 1).
+            stop_when: Optional callable evaluated per-item during the paginated
+                scan. Receives a shallow-copied dict of the current scanned item
+                and can return ``True`` or a string reason to abort the entire
+                scan early via :class:`StopConditionMetError`. Only checked when
+                the item doesn't deep-match *entries* — main-condition-wins
+                ordering. Keyword-only.
 
         Returns:
             The first full item dict that deep-matches *entries*.
@@ -297,9 +306,13 @@ class DynamoDBItemExpectation:
                 within *timeout*. Error stores ``.expected``, ``.actual``
                 (last complete scan result or None), ``.timeout``,
                 ``.table_name``.
+            StopConditionMetError: If *stop_when* returns a truthy value
+                during the scan — entire scan aborts immediately.
+            StopConditionError: If *stop_when* raises an exception.
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
+        start = time.monotonic()
         last_scan: list[dict[str, Any]] | None = None
 
         while True:
@@ -311,6 +324,12 @@ class DynamoDBItemExpectation:
                     )
                 if _deep_matches(item, entries):
                     return item
+                # D-03/D-09: per-item stop_when evaluation.
+                # Main-condition-wins: deep_matches already returned above.
+                # When stop_when fires, entire scan aborts immediately.
+                if stop_when is not None:
+                    resource_id = self._make_resource_id(key=None)
+                    _check_stop_condition(item, stop_when, resource_id, start, timeout)
                 current_scan.append(item)
 
             last_scan = current_scan
