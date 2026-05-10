@@ -88,8 +88,8 @@ Plans:
 
 Plans:
 - [x] 08-01-PLAN.md — Extract _check_stop_condition to _utils.py, update S3 imports
-- [ ] 08-02-PLAN.md — Add stop_when to DynamoDBItemExpectation.to_exist and to_find_item
-- [ ] 08-03-PLAN.md — Write integration tests for DynamoDB stop_when (18 test scenarios)
+- [x] 08-02-PLAN.md — Add stop_when to DynamoDBItemExpectation.to_exist and to_find_item
+- [x] 08-03-PLAN.md — Write integration tests for DynamoDB stop_when (18 test scenarios)
 
 ### Phase 9: Richer Timeout Errors
 **Goal**: Every timeout failure message shows what was expected and what was actually found, making failures self-documenting without a debugger
@@ -101,7 +101,11 @@ Plans:
   3. The `Expected:` / `Actual:` format is consistent across S3, DynamoDB, SQS, and Lambda timeout errors — same labels, same structure
   4. Exceptions with `expected=None` or `actual=None` gracefully omit those sections rather than printing `None`
   5. Legacy attribute names (e.g., `entries`, `body`, `event`) are preserved for backward compatibility — only `__str__` output improves
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Implement _truncate_value, _format_timeout_error helpers and WaitTimeoutError base class attributes
+- [ ] 09-02-PLAN.md — Update all WaitTimeoutError subclasses, rename call site parameters, extend tests
 
 ## Progress
 
@@ -115,4 +119,4 @@ Plans:
 | 6. Exception Foundation | v1.3.0 | 0/1 | Planned | — |
 | 7. S3 Smart Polling | v1.3.0 | 0/2 | Planned | — |
 | 8. DynamoDB Smart Polling | v1.3.0 | 0/3 | Planned | — |
-| 9. Richer Timeout Errors | v1.3.0 | 0/? | Not started | — |
+| 9. Richer Timeout Errors | v1.3.0 | 0/2 | Planned | — |
