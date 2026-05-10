@@ -184,12 +184,9 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
             msg = f"{message}\n\nActual (last seen):\n  {actual_fmt}"
         else:
             resource_desc = (
-                f"item {key} in table {table_name}" if key
-                else f"table {table_name}"
+                f"item {key} in table {table_name}" if key else f"table {table_name}"
             )
-            msg = _format_timeout_error(
-                resource_desc, expected, actual, timeout
-            )
+            msg = _format_timeout_error(resource_desc, expected, actual, timeout)
         super().__init__(msg)
 
 

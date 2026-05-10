@@ -17,6 +17,8 @@ from aws_expect.exceptions import (
     SQSUnexpectedEventError,
     SQSUnexpectedMessageError,
     SQSWaitTimeoutError,
+    StopConditionError,
+    StopConditionMetError,
     WaitTimeoutError,
 )
 from aws_expect.expect import (
@@ -52,6 +54,8 @@ __all__ = [
     "SQSUnexpectedEventError",
     "SQSUnexpectedMessageError",
     "SQSWaitTimeoutError",
+    "StopConditionError",
+    "StopConditionMetError",
     "WaitTimeoutError",
     "expect_all",
     "expect_any",

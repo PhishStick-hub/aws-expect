@@ -161,6 +161,7 @@ def _check_stop_condition(
     """
     # Lazy import to break circular dependency with exceptions.py
     from aws_expect.exceptions import StopConditionError, StopConditionMetError  # noqa: PLC0415
+
     if stop_when is None:
         return None
 

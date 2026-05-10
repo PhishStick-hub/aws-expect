@@ -282,7 +282,10 @@ class SQSQueueExpectation:
                         return message
         except SQSWaitTimeoutError as exc:
             raise SQSEventWaitTimeoutError(
-                self._queue_url, expected=event, timeout=timeout, actual=_parse_actual_events(exc.actual)
+                self._queue_url,
+                expected=event,
+                timeout=timeout,
+                actual=_parse_actual_events(exc.actual),
             ) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
@@ -333,7 +336,10 @@ class SQSQueueExpectation:
                 self._restore_messages(messages)
         except SQSWaitTimeoutError as exc:
             raise SQSEventWaitTimeoutError(
-                self._queue_url, expected=event, timeout=timeout, actual=_parse_actual_events(exc.actual)
+                self._queue_url,
+                expected=event,
+                timeout=timeout,
+                actual=_parse_actual_events(exc.actual),
             ) from exc
         raise AssertionError("unreachable")  # pragma: no cover
 
