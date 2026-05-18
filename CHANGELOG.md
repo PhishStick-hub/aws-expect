@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v1.4.0...v2.0.0) (2026-05-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **parallel:** simplify tuple format in expect_all/expect_any
+
+### Features
+
+* **parallel:** simplify tuple format in expect_all/expect_any ([cb3a4f0](https://github.com/PhishStick-hub/aws-expect/commit/cb3a4f02cbcd25d8466454c04c6ca630bf1fbc6d))
+
 ## [1.4.0](https://github.com/PhishStick-hub/aws-expect/compare/v1.3.0...v1.4.0) (2026-05-10)
 
 
