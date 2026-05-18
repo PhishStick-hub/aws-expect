@@ -8,11 +8,7 @@ from aws_expect.exceptions import AggregateWaitTimeoutError, WaitTimeoutError
 
 T = TypeVar("T")
 
-ExpectationItem: TypeAlias = (
-    Callable[[], T] | tuple[Callable[..., T], tuple, dict[str, Any]]
-)
-
-ExpectationTuple: TypeAlias = tuple[Callable[..., T], tuple, dict[str, Any]]
+ExpectationItem: TypeAlias = Callable[[], T] | tuple[Callable[..., T], *tuple[Any, ...]]
 
 
 def _submit_expectation(
@@ -21,23 +17,16 @@ def _submit_expectation(
 ) -> Future[T]:
     if isinstance(expectation, tuple):
         fn = cast(Callable[..., T], expectation[0])
-        args = cast(tuple, expectation[1])
-        kwargs = cast(dict[str, Any], expectation[2])
-        return executor.submit(fn, *args, **kwargs)
+        rest = expectation[1:]
+        if rest and isinstance(rest[-1], dict):
+            return executor.submit(fn, *rest[:-1], **rest[-1])
+        return executor.submit(fn, *rest)
     return executor.submit(expectation)
 
 
 @overload
 def expect_all(
     expectations: Sequence[Callable[[], T]],
-    *,
-    max_workers: int | None = None,
-) -> list[T]: ...
-
-
-@overload
-def expect_all(
-    expectations: Sequence[ExpectationTuple[T]],
     *,
     max_workers: int | None = None,
 ) -> list[T]: ...
@@ -93,19 +82,17 @@ def expect_all(
             ),
         ])
 
-    Example with (callable, args, kwargs) tuples::
+    Example with (callable, *args) tuples::
 
         from aws_expect import expect_all, expect_dynamodb_item
 
         results = expect_all([
             (
                 expect_dynamodb_item(users).to_exist,
-                ({"pk": "u1"}, 30, 1),
-                {},
+                {"pk": "u1"}, 30, 1,
             ),
             (
                 expect_dynamodb_item(orders).to_exist,
-                (),
                 {"key": {"pk": "o1"}, "timeout": 30, "poll_interval": 1},
             ),
         ])
@@ -146,14 +133,6 @@ def expect_all(
 @overload
 def expect_any(
     expectations: Sequence[Callable[[], T]],
-    *,
-    max_workers: int | None = None,
-) -> T: ...
-
-
-@overload
-def expect_any(
-    expectations: Sequence[ExpectationTuple[T]],
     *,
     max_workers: int | None = None,
 ) -> T: ...
@@ -210,20 +189,18 @@ def expect_any(
             ),
         ])
 
-    Example with (callable, args, kwargs) tuples::
+    Example with (callable, *args) tuples::
 
         from aws_expect import expect_any, expect_dynamodb_item
 
         result = expect_any([
             (
                 expect_dynamodb_item(table_a).to_exist,
-                ({"pk": "u1"}, 30, 1),
-                {},
+                {"pk": "u1"}, 30, 1,
             ),
             (
                 expect_dynamodb_item(table_b).to_exist,
-                ({"pk": "u1"}, 30, 1),
-                {},
+                {"pk": "u1"}, 30, 1,
             ),
         ])
     """
