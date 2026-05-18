@@ -265,7 +265,7 @@ class TestExpectAllFailure:
 
 
 class TestExpectAllTupleForm:
-    """Tests for expect_all with (fn, args, kwargs) tuple arguments."""
+    """Tests for expect_all with (fn, *args) tuple arguments."""
 
     def test_single_tuple_with_args_succeeds(
         self, dynamodb_tables: list[Table]
@@ -277,8 +277,9 @@ class TestExpectAllTupleForm:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "t1"}, 10, 1),
-                    {},
+                    {"pk": "t1"},
+                    10,
+                    1,
                 ),
             ]
         )
@@ -298,18 +299,21 @@ class TestExpectAllTupleForm:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "a"}, 10, 1),
-                    {},
+                    {"pk": "a"},
+                    10,
+                    1,
                 ),
                 (
                     expect_dynamodb_item(tables[1]).to_exist,
-                    ({"pk": "b"}, 10, 1),
-                    {},
+                    {"pk": "b"},
+                    10,
+                    1,
                 ),
                 (
                     expect_dynamodb_item(tables[2]).to_exist,
-                    ({"pk": "c"}, 10, 1),
-                    {},
+                    {"pk": "c"},
+                    10,
+                    1,
                 ),
             ]
         )
@@ -327,7 +331,6 @@ class TestExpectAllTupleForm:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    (),
                     {"key": {"pk": "noargs"}, "timeout": 10, "poll_interval": 1},
                 ),
             ]
@@ -346,8 +349,9 @@ class TestExpectAllTupleForm:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "mix1"}, 10, 1),
-                    {},
+                    {"pk": "mix1"},
+                    10,
+                    1,
                 ),
                 lambda: expect_dynamodb_item(tables[1]).to_exist(
                     key={"pk": "mix2"}, timeout=10, poll_interval=1
@@ -371,13 +375,15 @@ class TestExpectAllTupleForm:
                 [
                     (
                         expect_dynamodb_item(tables[0]).to_exist,
-                        ({"pk": "ok"}, 10, 1),
-                        {},
+                        {"pk": "ok"},
+                        10,
+                        1,
                     ),
                     (
                         expect_dynamodb_item(tables[1]).to_exist,
-                        ({"pk": "missing"}, 2, 1),
-                        {},
+                        {"pk": "missing"},
+                        2,
+                        1,
                     ),
                 ]
             )
@@ -397,7 +403,6 @@ class TestExpectAllTupleForm:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    (),
                     {
                         "key": {"pk": "kw"},
                         "timeout": 10,
@@ -411,7 +416,7 @@ class TestExpectAllTupleForm:
 
 
 class TestExpectAllMixed:
-    """Tests for expect_all with mixed (fn, args, kwargs) tuples and plain callables in the same sequence."""
+    """Tests for expect_all with mixed (fn, *args) tuples and plain callables in the same sequence."""
 
     def test_tuple_first_ordering_succeeds(self, dynamodb_tables: list[Table]) -> None:
         """Tuple at position 0, callable at position 1 — both succeed."""
@@ -423,8 +428,9 @@ class TestExpectAllMixed:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "t0"}, 10, 1),
-                    {},
+                    {"pk": "t0"},
+                    10,
+                    1,
                 ),
                 lambda: expect_dynamodb_item(tables[1]).to_exist(
                     key={"pk": "c1"}, timeout=10, poll_interval=1
@@ -451,8 +457,9 @@ class TestExpectAllMixed:
                 ),
                 (
                     expect_dynamodb_item(tables[1]).to_exist,
-                    ({"pk": "t1"}, 10, 1),
-                    {},
+                    {"pk": "t1"},
+                    10,
+                    1,
                 ),
             ]
         )
@@ -472,16 +479,18 @@ class TestExpectAllMixed:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "i0"}, 10, 1),
-                    {},
+                    {"pk": "i0"},
+                    10,
+                    1,
                 ),
                 lambda: expect_dynamodb_item(tables[1]).to_exist(
                     key={"pk": "i1"}, timeout=10, poll_interval=1
                 ),
                 (
                     expect_dynamodb_item(tables[2]).to_exist,
-                    ({"pk": "i2"}, 10, 1),
-                    {},
+                    {"pk": "i2"},
+                    10,
+                    1,
                 ),
             ]
         )
@@ -505,8 +514,9 @@ class TestExpectAllMixed:
                 [
                     (
                         expect_dynamodb_item(tables[0]).to_exist,
-                        ({"pk": "ok-t"}, 10, 1),
-                        {},
+                        {"pk": "ok-t"},
+                        10,
+                        1,
                     ),
                     lambda: expect_dynamodb_item(tables[1]).to_exist(
                         key={"pk": "missing"}, timeout=2, poll_interval=1
@@ -542,8 +552,9 @@ class TestExpectAllMixed:
                     ),
                     (
                         expect_dynamodb_item(tables[1]).to_exist,
-                        ({"pk": "nope-1"}, 2, 1),
-                        {},
+                        {"pk": "nope-1"},
+                        2,
+                        1,
                     ),
                     lambda: expect_dynamodb_item(tables[2]).to_exist(
                         key={"pk": "nope-2"}, timeout=2, poll_interval=1

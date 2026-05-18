@@ -184,7 +184,7 @@ class TestExpectAnyFailure:
 
 
 class TestExpectAnyTupleForm:
-    """Tests for expect_any with (fn, args, kwargs) tuple arguments."""
+    """Tests for expect_any with (fn, *args) tuple arguments."""
 
     def test_single_tuple_succeeds(self, dynamodb_tables: list[Table]) -> None:
         tables = dynamodb_tables
@@ -194,8 +194,9 @@ class TestExpectAnyTupleForm:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "any1"}, 10, 1),
-                    {},
+                    {"pk": "any1"},
+                    10,
+                    1,
                 ),
             ]
         )
@@ -213,18 +214,21 @@ class TestExpectAnyTupleForm:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "winner"}, 10, 1),
-                    {},
+                    {"pk": "winner"},
+                    10,
+                    1,
                 ),
                 (
                     expect_dynamodb_item(tables[1]).to_exist,
-                    ({"pk": "missing-1"}, 2, 1),
-                    {},
+                    {"pk": "missing-1"},
+                    2,
+                    1,
                 ),
                 (
                     expect_dynamodb_item(tables[2]).to_exist,
-                    ({"pk": "missing-2"}, 2, 1),
-                    {},
+                    {"pk": "missing-2"},
+                    2,
+                    1,
                 ),
             ]
         )
@@ -239,7 +243,6 @@ class TestExpectAnyTupleForm:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    (),
                     {"key": {"pk": "kw-any"}, "timeout": 10, "poll_interval": 1},
                 ),
             ]
@@ -257,18 +260,21 @@ class TestExpectAnyTupleForm:
                 [
                     (
                         expect_dynamodb_item(tables[0]).to_exist,
-                        ({"pk": "nope-1"}, 2, 1),
-                        {},
+                        {"pk": "nope-1"},
+                        2,
+                        1,
                     ),
                     (
                         expect_dynamodb_item(tables[1]).to_exist,
-                        ({"pk": "nope-2"}, 2, 1),
-                        {},
+                        {"pk": "nope-2"},
+                        2,
+                        1,
                     ),
                     (
                         expect_dynamodb_item(tables[2]).to_exist,
-                        ({"pk": "nope-3"}, 2, 1),
-                        {},
+                        {"pk": "nope-3"},
+                        2,
+                        1,
                     ),
                 ]
             )
@@ -291,14 +297,11 @@ class TestExpectAnyTupleForm:
                 ),
                 (
                     expect_dynamodb_item(tables[1]).to_exist,
-                    (
-                        {
-                            "key": {"pk": "missing"},
-                            "timeout": 2,
-                            "poll_interval": 1,
-                        },
-                    ),
-                    {},
+                    {
+                        "key": {"pk": "missing"},
+                        "timeout": 2,
+                        "poll_interval": 1,
+                    },
                 ),
             ]
         )
@@ -307,7 +310,7 @@ class TestExpectAnyTupleForm:
 
 
 class TestExpectAnyMixed:
-    """Tests for expect_any with mixed (fn, args, kwargs) tuples and plain callables in the same sequence."""
+    """Tests for expect_any with mixed (fn, *args) tuples and plain callables in the same sequence."""
 
     def test_tuple_first_succeeds(self, dynamodb_tables: list[Table]) -> None:
         """Tuple at position 0 — it succeeds, result returned."""
@@ -319,8 +322,9 @@ class TestExpectAnyMixed:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "t0"}, 10, 1),
-                    {},
+                    {"pk": "t0"},
+                    10,
+                    1,
                 ),
                 lambda: expect_dynamodb_item(tables[1]).to_exist(
                     key={"pk": "missing"}, timeout=2, poll_interval=1
@@ -343,8 +347,9 @@ class TestExpectAnyMixed:
                 ),
                 (
                     expect_dynamodb_item(tables[1]).to_exist,
-                    ({"pk": "missing"}, 2, 1),
-                    {},
+                    {"pk": "missing"},
+                    2,
+                    1,
                 ),
             ]
         )
@@ -361,16 +366,18 @@ class TestExpectAnyMixed:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "i0"}, 10, 1),
-                    {},
+                    {"pk": "i0"},
+                    10,
+                    1,
                 ),
                 lambda: expect_dynamodb_item(tables[1]).to_exist(
                     key={"pk": "nope-1"}, timeout=2, poll_interval=1
                 ),
                 (
                     expect_dynamodb_item(tables[2]).to_exist,
-                    ({"pk": "nope-2"}, 2, 1),
-                    {},
+                    {"pk": "nope-2"},
+                    2,
+                    1,
                 ),
             ]
         )
@@ -389,16 +396,18 @@ class TestExpectAnyMixed:
             [
                 (
                     expect_dynamodb_item(tables[0]).to_exist,
-                    ({"pk": "nope-0"}, 2, 1),
-                    {},
+                    {"pk": "nope-0"},
+                    2,
+                    1,
                 ),
                 lambda: expect_dynamodb_item(tables[1]).to_exist(
                     key={"pk": "winner"}, timeout=10, poll_interval=1
                 ),
                 (
                     expect_dynamodb_item(tables[2]).to_exist,
-                    ({"pk": "nope-2"}, 2, 1),
-                    {},
+                    {"pk": "nope-2"},
+                    2,
+                    1,
                 ),
             ]
         )
@@ -420,8 +429,9 @@ class TestExpectAnyMixed:
                     ),
                     (
                         expect_dynamodb_item(tables[1]).to_exist,
-                        ({"pk": "nope-1"}, 2, 1),
-                        {},
+                        {"pk": "nope-1"},
+                        2,
+                        1,
                     ),
                     lambda: expect_dynamodb_item(tables[2]).to_exist(
                         key={"pk": "nope-2"}, timeout=2, poll_interval=1
