@@ -15,6 +15,7 @@ from aws_expect._utils import (
 )
 from aws_expect.exceptions import (
     S3ContentWaitTimeoutError,
+    S3ObjectAppearedError,
     S3UnexpectedContentError,
     S3WaitTimeoutError,
 )
@@ -122,6 +123,15 @@ class S3ObjectExpectation:
         except WaiterError as exc:
             raise S3WaitTimeoutError(self._bucket, self._key, timeout) from exc
         return self._client.head_object(Bucket=self._bucket, Key=self._key)
+
+    def _head_object(self) -> HeadObjectOutputTypeDef | None:
+        """Return ``head_object`` metadata, or ``None`` when the object is absent."""
+        try:
+            return self._client.head_object(Bucket=self._bucket, Key=self._key)
+        except ClientError as err:
+            if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
+                raise
+            return None
 
     def _fetch_body(self) -> dict[str, Any] | None:
         """Fetch and parse the S3 object body as JSON.
@@ -263,3 +273,37 @@ class S3ObjectExpectation:
         except WaiterError as exc:
             raise S3WaitTimeoutError(self._bucket, self._key, timeout) from exc
         return None
+
+    def to_not_appear(
+        self,
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> None:
+        """Assert the S3 object does not appear within *timeout* seconds.
+
+        Polls every *poll_interval* seconds. If the object exists at any point
+        (including the first check), raises :class:`S3ObjectAppearedError`
+        immediately with the ``head_object`` metadata.
+
+        Args:
+            timeout: Maximum time in seconds to guard against object creation.
+            poll_interval: Time in seconds between polling attempts (minimum 1).
+
+        Returns:
+            None when the object stayed absent for the entire window.
+
+        Raises:
+            S3ObjectAppearedError: If the object is found during the wait window.
+        """
+        delay = _compute_delay(poll_interval)
+        deadline = time.monotonic() + timeout
+
+        while True:
+            metadata = self._head_object()
+            if metadata is not None:
+                raise S3ObjectAppearedError(self._bucket, self._key, timeout, metadata)
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            time.sleep(min(delay, remaining))

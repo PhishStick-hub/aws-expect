@@ -161,6 +161,34 @@ class S3UnexpectedContentError(Exception):
         )
 
 
+class S3ObjectAppearedError(Exception):
+    """Raised when to_not_appear detects the object was created during the wait window.
+
+    Does NOT inherit WaitTimeoutError — mirrors S3UnexpectedContentError.
+
+    Attributes:
+        bucket: S3 bucket name.
+        key: S3 object key.
+        timeout: The time window (seconds) during which the object was expected to stay absent.
+        metadata: The head_object response dict for the appeared object.
+    """
+
+    def __init__(
+        self,
+        bucket: str,
+        key: str,
+        timeout: float,
+        metadata: Any,
+    ) -> None:
+        self.bucket = bucket
+        self.key = key
+        self.timeout = timeout
+        self.metadata = metadata
+        super().__init__(
+            f"Object s3://{bucket}/{key} appeared within {timeout}s window"
+        )
+
+
 class DynamoDBWaitTimeoutError(WaitTimeoutError):
     """Raised when a DynamoDB wait operation exceeds the specified timeout."""
 
