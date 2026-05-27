@@ -98,7 +98,7 @@ class TestSQSToHaveEvent:
                 poll_interval=1,
             )
 
-        assert exc_info.value.event == {"source": "my-app"}
+        assert exc_info.value.expected == {"source": "my-app"}
         assert exc_info.value.timeout == 2
         assert exc_info.value.queue_url == sqs_queue.url
         assert "Expected:" in str(exc_info.value)
@@ -259,7 +259,7 @@ class TestSQSToConsumeEvent:
                 poll_interval=1,
             )
 
-        assert exc_info.value.event == {"source": "my-app"}
+        assert exc_info.value.expected == {"source": "my-app"}
         assert exc_info.value.timeout == 2
         assert "Expected:" in str(exc_info.value)
         assert "Actual:" not in str(exc_info.value)

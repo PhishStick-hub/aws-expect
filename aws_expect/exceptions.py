@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from aws_expect._utils import _format_timeout_error
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef
 
 NON_NUMERIC_FIELD_MSG = (
     "Field '{field}' has non-numeric value {value!r}"
@@ -178,7 +181,7 @@ class S3ObjectAppearedError(Exception):
         bucket: str,
         key: str,
         timeout: float,
-        metadata: Any,
+        metadata: HeadObjectOutputTypeDef,
     ) -> None:
         self.bucket = bucket
         self.key = key
@@ -205,7 +208,6 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         self.key = key
         self.timeout = timeout
         self.expected = expected
-        self.entries = expected  # deprecated, use .expected
         self.actual = actual
         if message is not None:
             actual_fmt = repr(actual) if actual is not None else "None"
@@ -244,11 +246,7 @@ class DynamoDBFindItemTimeoutError(DynamoDBWaitTimeoutError):
         self.expected = expected
         self.actual = actual
         self.timeout = timeout
-        # Initialise parent-class attributes that DynamoDBWaitTimeoutError.__init__
-        # would set, so that callers catching as DynamoDBWaitTimeoutError can
-        # safely access .key and .entries without AttributeError.
         self.key = None
-        self.entries = expected  # deprecated, use .expected
         WaitTimeoutError.__init__(
             self,
             _format_timeout_error(
@@ -430,7 +428,6 @@ class SQSWaitTimeoutError(WaitTimeoutError):
     ) -> None:
         self.queue_url = queue_url
         self.expected = expected
-        self.body = expected  # deprecated, use .expected
         self.timeout = timeout
         self.actual = actual
         msg = _format_timeout_error(
@@ -485,7 +482,6 @@ class SQSEventWaitTimeoutError(WaitTimeoutError):
     ) -> None:
         self.queue_url = queue_url
         self.expected = expected
-        self.event = expected  # deprecated, use .expected
         self.timeout = timeout
         self.actual = actual
         msg = _format_timeout_error(
