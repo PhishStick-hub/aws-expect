@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.0](https://github.com/PhishStick-hub/aws-expect/compare/v2.0.0...v2.1.0) (2026-05-27)
+
+
+### Features
+
+* **s3:** add to_not_appear method for guarding against object creation ([7ae4881](https://github.com/PhishStick-hub/aws-expect/commit/7ae4881d4074b9193a1939e1553732904a90a840))
+
+
+### Documentation
+
+* **s3:** clarify shallow vs deep matching and trim verbose docstrings ([5e176c5](https://github.com/PhishStick-hub/aws-expect/commit/5e176c522d66be1ad3a00ffc4cb39d8740d258f6))
+
 ## [2.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v1.4.0...v2.0.0) (2026-05-18)
 
 
