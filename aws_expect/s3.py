@@ -69,41 +69,27 @@ class S3ObjectExpectation:
     ) -> HeadObjectOutputTypeDef | dict[str, Any]:
         """Wait for the S3 object to exist and optionally match *entries*.
 
-        When *entries* is ``None`` the native ``object_exists`` waiter is used
-        and the ``head_object`` response metadata dict is returned.
-
-        When *entries* is provided the object body is retrieved on each poll,
-        parsed as JSON, and checked for a **shallow subset match** against
-        *entries* using :func:`_matches_entries`. This means top-level keys and
-        their values must be equal, but nested dicts are compared by equality
-        rather than recursively checked for a subset. For recursive (deep)
-        subset matching use :meth:`to_have_content` instead.
+        Without *entries*, uses the native ``object_exists`` waiter and returns
+        ``head_object`` metadata. With *entries*, polls the object body and
+        checks for a **shallow** subset match (top-level keys only — nested
+        dicts must match exactly). For deep recursive matching use
+        :meth:`to_have_content`.
 
         Args:
-            timeout: Maximum time in seconds to wait.
-            poll_interval: Time in seconds between polling attempts (minimum 1).
-            entries: Optional dict of expected key-value pairs. When provided
-                the parsed JSON body must contain **at least** these top-level
-                entries with equal values (**shallow** match — nested dicts must
-                match exactly, not as a subset). Use :meth:`to_have_content` for
-                deep recursive subset matching.
-            stop_when: Optional callable that receives a shallow-copied dict of
-                the current resource state and can return ``True`` or a string
-                reason to abort polling early via :class:`StopConditionMetError`.
-                Only evaluated when *entries* don't match — main-condition-wins
-                ordering. Keyword-only. Raises :class:`TypeError` if provided
-                without *entries*.
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+            entries: Optional expected key-value pairs for shallow subset match.
+            stop_when: Callable receiving the current body state; return ``True``
+                or a string to abort early. Requires *entries*. Keyword-only.
 
         Returns:
-            The ``head_object`` response metadata dict when *entries* is
-            ``None``, or the parsed JSON body dict when *entries* is given.
+            ``head_object`` metadata dict (no *entries*) or parsed JSON body.
 
         Raises:
-            S3WaitTimeoutError: If the object does not exist (or does not
-                match *entries*) within *timeout*.
-            StopConditionMetError: If *stop_when* returns a truthy value.
-            StopConditionError: If *stop_when* raises an exception.
-            TypeError: If *stop_when* is provided without *entries*.
+            S3WaitTimeoutError: Object does not exist or match within *timeout*.
+            StopConditionMetError: *stop_when* returns a truthy value.
+            StopConditionError: *stop_when* raises an exception.
+            TypeError: *stop_when* provided without *entries*.
         """
         if stop_when is not None and entries is None:
             raise TypeError(
@@ -230,20 +216,15 @@ class S3ObjectExpectation:
     ) -> None:
         """Assert the S3 object body does not deep-match *entries* after *delay* seconds.
 
-        Waits *delay* seconds (minimum 1 second via _compute_delay), then reads
-        the object body once. If the body is valid JSON and deep-matches *entries*,
-        raises S3UnexpectedContentError. Otherwise returns None.
+        Reads the object body once after waiting. Returns None if the object is
+        missing, body is non-JSON, or body does not match.
 
         Args:
             entries: Dict to check against the object body.
-            delay: Seconds to wait before the check. Minimum 1 second. Defaults to 0.
-
-        Returns:
-            None if the object is missing, body is non-JSON, or body does not match.
+            delay: Seconds to wait before the check (minimum 1). Defaults to 0.
 
         Raises:
-            S3UnexpectedContentError: If the body IS valid JSON and DOES deep-match
-                *entries*.
+            S3UnexpectedContentError: If the body deep-matches *entries*.
         """
         time.sleep(_compute_delay(delay))
         body = self._fetch_body()
@@ -254,11 +235,8 @@ class S3ObjectExpectation:
         """Wait for the S3 object to not exist using the native ``object_not_exists`` waiter.
 
         Args:
-            timeout: Maximum time in seconds to wait.
-            poll_interval: Time in seconds between polling attempts (minimum 1).
-
-        Returns:
-            None when the object no longer exists.
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
 
         Raises:
             S3WaitTimeoutError: If the object still exists after *timeout*.
@@ -281,19 +259,15 @@ class S3ObjectExpectation:
     ) -> None:
         """Assert the S3 object does not appear within *timeout* seconds.
 
-        Polls every *poll_interval* seconds. If the object exists at any point
-        (including the first check), raises :class:`S3ObjectAppearedError`
-        immediately with the ``head_object`` metadata.
+        Polls every *poll_interval* seconds. Raises immediately if the object
+        is found at any point.
 
         Args:
-            timeout: Maximum time in seconds to guard against object creation.
-            poll_interval: Time in seconds between polling attempts (minimum 1).
-
-        Returns:
-            None when the object stayed absent for the entire window.
+            timeout: Maximum seconds to guard against object creation.
+            poll_interval: Seconds between polls (minimum 1).
 
         Raises:
-            S3ObjectAppearedError: If the object is found during the wait window.
+            S3ObjectAppearedError: If the object is found during the wait.
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
