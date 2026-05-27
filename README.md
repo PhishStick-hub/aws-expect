@@ -246,9 +246,10 @@ except WaitTimeoutError:
 
 | Method | Description |
 |--------|-------------|
-| `to_exist(timeout, poll_interval, entries, *, stop_when)` | Wait for object to exist; optionally match metadata entries and abort early via `stop_when` |
+| `to_exist(timeout, poll_interval, entries, *, stop_when)` | Wait for object to exist; with *entries*, **shallow** subset-match body JSON (top-level keys only); supports `stop_when` |
 | `to_not_exist(timeout, poll_interval)` | Wait for object to be deleted |
-| `to_have_content(entries, timeout, poll_interval)` | Wait until object body is valid JSON deep-matching `entries` |
+| `to_not_appear(timeout, poll_interval)` | Assert object does not appear within timeout |
+| `to_have_content(entries, timeout, poll_interval)` | Wait until object body is valid JSON **deep**-matching `entries` (recursive subset) |
 | `to_not_have_content(entries, delay)` | Assert object body does not deep-match `entries` after `delay` |
 
 ### DynamoDB Item (`DynamoDBItemExpectation`)
