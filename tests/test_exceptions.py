@@ -141,7 +141,6 @@ class TestDynamoDBWaitTimeoutErrorStr:
             "tbl", {"pk": "1"}, 10.0, expected={"a": 1}, actual={"b": 2}
         )
         assert e.expected == {"a": 1}
-        assert e.entries == {"a": 1}  # backward compat
 
     def test_shows_expected_and_actual_in_str(self) -> None:
         e = DynamoDBWaitTimeoutError(
@@ -171,11 +170,6 @@ class TestDynamoDBFindItemTimeoutErrorStr:
         assert "Expected:" in msg
         assert "Actual:" in msg
 
-    def test_entries_backward_compat(self) -> None:
-        e = DynamoDBFindItemTimeoutError("tbl", {"x": 1}, None, 10.0)
-        assert e.entries == {"x": 1}
-        assert e.expected == {"x": 1}
-
 
 class TestLambdaWaitTimeoutErrorStr:
     """ERR-02: LambdaWaitTimeoutError omits Expected:/Actual: when both None."""
@@ -204,7 +198,6 @@ class TestSQSWaitTimeoutErrorStr:
     def test_expected_field_rename(self) -> None:
         e = SQSWaitTimeoutError("url", "hello world", 10.0, actual=["msg1"])
         assert e.expected == "hello world"
-        assert e.body == "hello world"  # backward compat
 
     def test_shows_expected_and_actual(self) -> None:
         e = SQSWaitTimeoutError("url", "hello", 10.0, actual=["a", "b"])
@@ -219,7 +212,6 @@ class TestSQSEventWaitTimeoutErrorStr:
     def test_expected_field_rename(self) -> None:
         e = SQSEventWaitTimeoutError("url", {"type": "order"}, 10.0, actual=[{"x": 1}])
         assert e.expected == {"type": "order"}
-        assert e.event == {"type": "order"}  # backward compat
 
     def test_shows_expected_and_actual(self) -> None:
         e = SQSEventWaitTimeoutError("url", {"type": "order"}, 10.0, actual=[{"x": 1}])

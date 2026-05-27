@@ -35,7 +35,7 @@ class TestSQSToHaveMessage:
                 body="hello", timeout=2, poll_interval=1
             )
 
-        assert exc_info.value.body == "hello"
+        assert exc_info.value.expected == "hello"
         assert exc_info.value.timeout == 2
         assert exc_info.value.queue_url == sqs_queue.url
         assert "Expected:" in str(exc_info.value)
@@ -125,7 +125,7 @@ class TestSQSToConsumeMessage:
                 body="hello", timeout=2, poll_interval=1
             )
 
-        assert exc_info.value.body == "hello"
+        assert exc_info.value.expected == "hello"
         assert exc_info.value.timeout == 2
         assert "Expected:" in str(exc_info.value)
         assert "Actual:" not in str(exc_info.value)

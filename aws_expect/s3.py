@@ -20,6 +20,8 @@ from aws_expect.exceptions import (
     S3WaitTimeoutError,
 )
 
+_S3_NOT_FOUND_CODES: frozenset[str] = frozenset({"NoSuchKey", "404"})
+
 if TYPE_CHECKING:
     from mypy_boto3_s3.service_resource import Object as S3Object
     from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef
@@ -115,7 +117,7 @@ class S3ObjectExpectation:
         try:
             return self._client.head_object(Bucket=self._bucket, Key=self._key)
         except ClientError as err:
-            if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
+            if err.response["Error"]["Code"] not in _S3_NOT_FOUND_CODES:
                 raise
             return None
 
@@ -131,7 +133,7 @@ class S3ObjectExpectation:
             body = json.loads(response["Body"].read())
             return body if isinstance(body, dict) else None
         except ClientError as err:
-            if err.response["Error"]["Code"] not in ("NoSuchKey", "404"):
+            if err.response["Error"]["Code"] not in _S3_NOT_FOUND_CODES:
                 raise
             return None
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -250,7 +252,6 @@ class S3ObjectExpectation:
             )
         except WaiterError as exc:
             raise S3WaitTimeoutError(self._bucket, self._key, timeout) from exc
-        return None
 
     def to_not_appear(
         self,
@@ -279,5 +280,5 @@ class S3ObjectExpectation:
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                return None
+                return
             time.sleep(min(delay, remaining))
