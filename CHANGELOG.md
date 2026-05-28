@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.0](https://github.com/PhishStick-hub/aws-expect/compare/v2.1.0...v2.2.0) (2026-05-28)
+
+
+### Features
+
+* **dynamodb:** add datetime validation and table emptiness waiters ([3e3a6c8](https://github.com/PhishStick-hub/aws-expect/commit/3e3a6c8adf5d24b0732261de28c551807f6f1c66))
+* **dynamodb:** add to_be_empty and to_be_not_empty to DynamoDBTableExpectation ([aa6eccf](https://github.com/PhishStick-hub/aws-expect/commit/aa6eccfcfa4b2a3f0bd3d27225dc1d195135ffae))
+* **dynamodb:** add to_have_datetime_close_to for timestamp field validation ([2d8dd6d](https://github.com/PhishStick-hub/aws-expect/commit/2d8dd6dd94a3785cab745ab90ca2c5af680499ed))
+
 ## [2.1.0](https://github.com/PhishStick-hub/aws-expect/compare/v2.0.0...v2.1.0) (2026-05-27)
 
 
