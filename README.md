@@ -101,6 +101,25 @@ item = expect_dynamodb_item(table).to_find_item(
     stop_when=lambda item: item.get("status") == "failed",
     timeout=60,
 )
+
+# Wait for a timestamp field to be close to a target datetime
+from datetime import datetime, timedelta, timezone
+
+item = expect_dynamodb_item(table).to_have_datetime_close_to(
+    key={"pk": "event-1"},
+    field="created_at",
+    delta=timedelta(seconds=30),
+    expected=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    timeout=10,
+)
+
+# Defaults to now(UTC) when expected is omitted
+item = expect_dynamodb_item(table).to_have_datetime_close_to(
+    key={"pk": "event-1"},
+    field="created_at",
+    delta=timedelta(minutes=5),
+    timeout=10,
+)
 ```
 
 ### DynamoDB Table Waiting
@@ -112,6 +131,12 @@ dynamodb = boto3.resource("dynamodb")
 
 description = expect_dynamodb_table(dynamodb, "orders").to_exist(timeout=30)
 expect_dynamodb_table(dynamodb, "orders").to_not_exist(timeout=30)
+
+# Wait for table to be empty (no items)
+expect_dynamodb_table(dynamodb, "orders").to_be_empty(timeout=30)
+
+# Wait for table to contain at least one item
+expect_dynamodb_table(dynamodb, "orders").to_be_not_empty(timeout=30)
 ```
 
 ### SQS Message Waiting
@@ -258,9 +283,8 @@ except WaitTimeoutError:
 |--------|-------------|
 | `to_exist(key, timeout, poll_interval, entries, *, stop_when)` | Wait for item to exist; optionally match attribute entries and abort early via `stop_when` |
 | `to_not_exist(key, timeout, poll_interval)` | Wait for item to be deleted |
-| `to_be_empty(timeout, poll_interval)` | Wait for table to have no items |
-| `to_be_not_empty(timeout, poll_interval)` | Wait for table to have at least one item |
 | `to_have_numeric_value_close_to(key, field, value, delta, timeout, poll_interval)` | Wait for a numeric field to be within delta of value |
+| `to_have_datetime_close_to(key, field, delta, expected, timeout, poll_interval)` | Wait for a timestamp field (epoch or ISO 8601) to be within *delta* of *expected* (defaults to `now(UTC)`) |
 | `to_find_item(entries, timeout, poll_interval, *, stop_when)` | Scan table until at least one item subset-matches `entries`; abort via `stop_when` |
 | `to_not_find_item(entries, delay)` | Assert no item matches `entries` after `delay` |
 
@@ -270,6 +294,8 @@ except WaitTimeoutError:
 |--------|-------------|
 | `to_exist(timeout, poll_interval)` | Wait for table to exist (Active state) |
 | `to_not_exist(timeout, poll_interval)` | Wait for table to be deleted |
+| `to_be_empty(timeout, poll_interval)` | Wait for table to exist, be Active, and contain no items |
+| `to_be_not_empty(timeout, poll_interval)` | Wait for table to exist, be Active, and contain at least one item |
 
 ### SQS (`SQSQueueExpectation`)
 
@@ -306,6 +332,7 @@ All timeout exceptions inherit from `WaitTimeoutError`:
 | `DynamoDBFindItemTimeoutError` | `to_find_item` |
 | `DynamoDBUnexpectedItemError` | `to_not_find_item` (not a timeout) |
 | `DynamoDBNonNumericFieldError` | `to_have_numeric_value_close_to` (not a timeout) |
+| `DynamoDBInvalidTimestampError` | `to_have_datetime_close_to` (not a timeout) |
 | `SQSWaitTimeoutError` | SQS string-body methods |
 | `SQSEventWaitTimeoutError` | SQS JSON event methods |
 | `SQSUnexpectedMessageError` | `to_not_have_message` (not a timeout) |
