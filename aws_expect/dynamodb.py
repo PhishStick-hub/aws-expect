@@ -769,3 +769,124 @@ class DynamoDBTableExpectation:
                     ),
                 )
             time.sleep(min(delay, remaining))
+
+    def to_be_empty(
+        self,
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> None:
+        """Poll until the table exists, is ``ACTIVE``, and contains no items.
+
+        Each poll iteration first checks that the table exists and is
+        ``ACTIVE`` via ``describe_table``.  Only then does it perform a
+        lightweight ``scan(Select="COUNT", Limit=1)`` to check for items.
+        Tables that do not yet exist or are still in ``CREATING`` state
+        are treated as not yet ready.
+
+        Args:
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+
+        Returns:
+            ``None`` when the table is empty.
+
+        Raises:
+            DynamoDBWaitTimeoutError: If the table does not exist, does
+                not become ``ACTIVE``, or still contains items after
+                *timeout*.
+
+        Note:
+            DynamoDB ``scan`` is eventually consistent.  Recently deleted
+            items may still appear in results for a short period.
+        """
+        delay = _compute_delay(poll_interval)
+        deadline = time.monotonic() + timeout
+
+        while True:
+            try:
+                response = self._client.describe_table(
+                    TableName=self._table_name,
+                )
+                if response["Table"].get("TableStatus") == "ACTIVE":
+                    scan_response = self._client.scan(
+                        TableName=self._table_name,
+                        Select="COUNT",
+                        Limit=1,
+                    )
+                    if scan_response.get("Count", 0) == 0:
+                        return None
+            except self._client.exceptions.ResourceNotFoundException:
+                pass
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise DynamoDBWaitTimeoutError(
+                    self._table_name,
+                    key=None,
+                    timeout=timeout,
+                    message=(
+                        f"Timed out after {timeout}s waiting for table "
+                        f"{self._table_name} to be empty"
+                    ),
+                )
+            time.sleep(min(delay, remaining))
+
+    def to_be_not_empty(
+        self,
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> None:
+        """Poll until the table exists, is ``ACTIVE``, and contains items.
+
+        Each poll iteration first checks that the table exists and is
+        ``ACTIVE`` via ``describe_table``.  Only then does it perform a
+        lightweight ``scan(Select="COUNT", Limit=1)`` to check for items.
+        Tables that do not yet exist or are still in ``CREATING`` state
+        are treated as not yet ready.
+
+        Args:
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+
+        Returns:
+            ``None`` when the table contains at least one item.
+
+        Raises:
+            DynamoDBWaitTimeoutError: If the table does not exist, does
+                not become ``ACTIVE``, or remains empty after *timeout*.
+
+        Note:
+            DynamoDB ``scan`` is eventually consistent.  Recently written
+            items may not appear in results for a short period.
+        """
+        delay = _compute_delay(poll_interval)
+        deadline = time.monotonic() + timeout
+
+        while True:
+            try:
+                response = self._client.describe_table(
+                    TableName=self._table_name,
+                )
+                if response["Table"].get("TableStatus") == "ACTIVE":
+                    scan_response = self._client.scan(
+                        TableName=self._table_name,
+                        Select="COUNT",
+                        Limit=1,
+                    )
+                    if scan_response.get("Count", 0) > 0:
+                        return None
+            except self._client.exceptions.ResourceNotFoundException:
+                pass
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise DynamoDBWaitTimeoutError(
+                    self._table_name,
+                    key=None,
+                    timeout=timeout,
+                    message=(
+                        f"Timed out after {timeout}s waiting for table "
+                        f"{self._table_name} to not be empty"
+                    ),
+                )
+            time.sleep(min(delay, remaining))
