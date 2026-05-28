@@ -143,3 +143,135 @@ class TestDynamoDBTableToNotExist:
             # Cleanup in case the test failed before deletion happened
             with suppress(Exception):
                 dynamodb_resource.meta.client.delete_table(TableName=table_name)
+
+
+class TestDynamoDBTableToBeEmpty:
+    """Tests for expect_dynamodb_table(resource, name).to_be_empty()."""
+
+    def test_returns_none_when_table_is_empty(
+        self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
+    ) -> None:
+        result = expect_dynamodb_table(
+            dynamodb_resource, dynamodb_table.name
+        ).to_be_empty(timeout=10, poll_interval=1)
+
+        assert result is None
+
+    def test_raises_timeout_when_table_has_items(
+        self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
+    ) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-1"})
+
+        with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
+            expect_dynamodb_table(dynamodb_resource, dynamodb_table.name).to_be_empty(
+                timeout=2, poll_interval=1
+            )
+
+        assert exc_info.value.table_name == dynamodb_table.name
+        assert exc_info.value.key is None
+        assert exc_info.value.timeout == 2
+
+    def test_catchable_as_base_wait_timeout_error(
+        self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
+    ) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-1"})
+
+        with pytest.raises(WaitTimeoutError):
+            expect_dynamodb_table(dynamodb_resource, dynamodb_table.name).to_be_empty(
+                timeout=2, poll_interval=1
+            )
+
+    def test_raises_timeout_when_table_does_not_exist(
+        self, dynamodb_resource: DynamoDBServiceResource
+    ) -> None:
+        table_name = f"nonexistent-{uuid4().hex[:12]}"
+
+        with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
+            expect_dynamodb_table(dynamodb_resource, table_name).to_be_empty(
+                timeout=2, poll_interval=1
+            )
+
+        assert exc_info.value.table_name == table_name
+
+    def test_succeeds_when_items_deleted_mid_poll(
+        self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
+    ) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-1"})
+
+        def delete_later() -> None:
+            dynamodb_table.delete_item(Key={"pk": "item-1"})
+
+        timer = threading.Timer(2.0, delete_later)
+        timer.start()
+
+        try:
+            result = expect_dynamodb_table(
+                dynamodb_resource, dynamodb_table.name
+            ).to_be_empty(timeout=30, poll_interval=1)
+            assert result is None
+        finally:
+            timer.cancel()
+
+
+class TestDynamoDBTableToBeNotEmpty:
+    """Tests for expect_dynamodb_table(resource, name).to_be_not_empty()."""
+
+    def test_returns_none_when_table_has_items(
+        self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
+    ) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-1"})
+
+        result = expect_dynamodb_table(
+            dynamodb_resource, dynamodb_table.name
+        ).to_be_not_empty(timeout=10, poll_interval=1)
+
+        assert result is None
+
+    def test_raises_timeout_when_table_is_empty(
+        self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
+    ) -> None:
+        with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
+            expect_dynamodb_table(
+                dynamodb_resource, dynamodb_table.name
+            ).to_be_not_empty(timeout=2, poll_interval=1)
+
+        assert exc_info.value.table_name == dynamodb_table.name
+        assert exc_info.value.key is None
+        assert exc_info.value.timeout == 2
+
+    def test_catchable_as_base_wait_timeout_error(
+        self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
+    ) -> None:
+        with pytest.raises(WaitTimeoutError):
+            expect_dynamodb_table(
+                dynamodb_resource, dynamodb_table.name
+            ).to_be_not_empty(timeout=2, poll_interval=1)
+
+    def test_raises_timeout_when_table_does_not_exist(
+        self, dynamodb_resource: DynamoDBServiceResource
+    ) -> None:
+        table_name = f"nonexistent-{uuid4().hex[:12]}"
+
+        with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
+            expect_dynamodb_table(dynamodb_resource, table_name).to_be_not_empty(
+                timeout=2, poll_interval=1
+            )
+
+        assert exc_info.value.table_name == table_name
+
+    def test_succeeds_when_items_added_mid_poll(
+        self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
+    ) -> None:
+        def add_later() -> None:
+            dynamodb_table.put_item(Item={"pk": "item-1"})
+
+        timer = threading.Timer(2.0, add_later)
+        timer.start()
+
+        try:
+            result = expect_dynamodb_table(
+                dynamodb_resource, dynamodb_table.name
+            ).to_be_not_empty(timeout=30, poll_interval=1)
+            assert result is None
+        finally:
+            timer.cancel()
