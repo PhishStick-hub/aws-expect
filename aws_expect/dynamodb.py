@@ -244,6 +244,13 @@ class DynamoDBItemExpectation:
             f" in table {self._table_name}"
         )
         last_item: dict[str, Any] | None = None
+        target: datetime | None = None
+        if expected is not None:
+            target = (
+                expected.replace(tzinfo=timezone.utc)
+                if expected.tzinfo is None
+                else expected
+            )
 
         while True:
             response = self._table.get_item(Key=key)
@@ -255,14 +262,10 @@ class DynamoDBItemExpectation:
                         raise DynamoDBInvalidTimestampError(
                             self._table_name, key, field, value, timeout
                         )
-                    target = (
-                        expected.replace(tzinfo=timezone.utc)
-                        if expected is not None and expected.tzinfo is None
-                        else expected
+                    effective_target = (
+                        target if target is not None else datetime.now(timezone.utc)
                     )
-                    if target is None:
-                        target = datetime.now(timezone.utc)
-                    if self._is_datetime_close(parsed, target, delta_seconds):
+                    if self._is_datetime_close(parsed, effective_target, delta_seconds):
                         return item
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -545,7 +548,7 @@ class DynamoDBItemExpectation:
         if isinstance(value, str):
             try:
                 dt = datetime.fromisoformat(value)
-            except (ValueError, TypeError):
+            except ValueError:
                 return None
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)

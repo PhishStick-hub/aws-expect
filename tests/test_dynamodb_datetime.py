@@ -74,11 +74,9 @@ class TestToHaveDatetimeCloseTo:
     def test_returns_item_when_iso_string_with_tz_within_delta(
         self, dynamodb_table: Table
     ) -> None:
-        from datetime import timezone as tz
-
-        offset = tz(timedelta(hours=5))
+        offset = timezone(timedelta(hours=5))
         stored = datetime(2025, 6, 1, 12, 0, 0, tzinfo=offset)
-        expected_utc = datetime(2025, 6, 1, 7, 0, 0, tzinfo=tz.utc)
+        expected_utc = datetime(2025, 6, 1, 7, 0, 0, tzinfo=timezone.utc)
 
         dynamodb_table.put_item(
             Item={"pk": "item-tz", "created_at": stored.isoformat()}
