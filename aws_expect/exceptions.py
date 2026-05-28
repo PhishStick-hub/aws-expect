@@ -327,6 +327,46 @@ class DynamoDBNonNumericFieldError(Exception):
         )
 
 
+class DynamoDBInvalidTimestampError(Exception):
+    """Raised immediately when a DynamoDB item field cannot be parsed as a timestamp.
+
+    Unlike :class:`DynamoDBWaitTimeoutError`, this is not a polling timeout —
+    it signals that the field value is of the wrong type or format and polling
+    cannot succeed regardless of how long the wait continues.
+
+    The method accepts numeric values (``int``, ``float``, ``Decimal`` —
+    interpreted as Unix epoch seconds) and ISO 8601 strings.  Any other
+    type, or an unparseable string, triggers this error.
+
+    Attributes:
+        table_name: Name of the DynamoDB table.
+        key: Primary key dict used to look up the item.
+        field: Name of the attribute that held the invalid value.
+        value: The actual value found in the field.
+        timeout: The timeout that was configured for the wait operation.
+    """
+
+    def __init__(
+        self,
+        table_name: str,
+        key: dict[str, Any],
+        field: str,
+        value: Any,
+        timeout: float,
+    ) -> None:
+        self.table_name = table_name
+        self.key = key
+        self.field = field
+        self.value = value
+        self.timeout = timeout
+        super().__init__(
+            f"Field '{field}' has value {value!r} (type {type(value).__name__})"
+            f" that cannot be parsed as a timestamp"
+            f" for item {key} in table {table_name}."
+            f" Expected a numeric epoch (int/float/Decimal) or ISO 8601 string."
+        )
+
+
 class LambdaWaitTimeoutError(WaitTimeoutError):
     """Raised when a Lambda wait operation exceeds the specified timeout.
 

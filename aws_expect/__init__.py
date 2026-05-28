@@ -4,6 +4,7 @@ from aws_expect.dynamodb import DynamoDBItemExpectation, DynamoDBTableExpectatio
 from aws_expect.exceptions import (
     AggregateWaitTimeoutError,
     DynamoDBFindItemTimeoutError,
+    DynamoDBInvalidTimestampError,
     DynamoDBNonNumericFieldError,
     DynamoDBUnexpectedItemError,
     DynamoDBWaitTimeoutError,
@@ -37,6 +38,7 @@ from aws_expect.sqs import SQSQueueExpectation
 __all__ = [
     "AggregateWaitTimeoutError",
     "DynamoDBFindItemTimeoutError",
+    "DynamoDBInvalidTimestampError",
     "DynamoDBItemExpectation",
     "DynamoDBNonNumericFieldError",
     "DynamoDBTableExpectation",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Callable, Iterator
 
@@ -12,6 +13,7 @@ from aws_expect._utils import (
 )
 from aws_expect.exceptions import (
     DynamoDBFindItemTimeoutError,
+    DynamoDBInvalidTimestampError,
     DynamoDBNonNumericFieldError,
     DynamoDBUnexpectedItemError,
     DynamoDBWaitTimeoutError,
@@ -169,6 +171,98 @@ class DynamoDBItemExpectation:
                             self._table_name, key, field, value, timeout
                         )
                     if self._is_close(value, expected, delta):
+                        return item
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise DynamoDBWaitTimeoutError(
+                    self._table_name,
+                    key,
+                    timeout,
+                    message=timeout_message,
+                    actual=last_item,
+                )
+            time.sleep(min(delay, remaining))
+
+    def to_have_datetime_close_to(
+        self,
+        key: dict[str, Any],
+        field: str,
+        delta: timedelta,
+        expected: datetime | None = None,
+        timeout: float = 30,
+        poll_interval: float = 5,
+    ) -> dict[str, Any]:
+        """Poll ``get_item`` until the item exists and a timestamp field is within *delta* of *expected*.
+
+        The condition is satisfied when
+        ``abs(parse(item[field]) - expected) <= delta``.
+
+        The field value is auto-detected:
+
+        - **Numeric** (``int``, ``float``, ``Decimal``) — interpreted as
+          Unix epoch seconds.
+        - **String** — parsed as ISO 8601.  Naive strings (no timezone
+          offset) are treated as UTC.
+
+        If *expected* is ``None``, it defaults to
+        ``datetime.now(timezone.utc)`` evaluated on **each poll iteration**
+        so the comparison always uses a fresh "now".
+
+        If the field exists but its value cannot be parsed as a timestamp,
+        a :class:`DynamoDBInvalidTimestampError` is raised immediately.
+        A missing item or absent field is treated as the condition not yet
+        being met, and polling continues.
+
+        Args:
+            key: Primary key dict, e.g. ``{"pk": "val"}`` or
+                ``{"pk": "val", "sk": "val"}``.
+            field: Name of the timestamp attribute to check.
+            delta: Maximum allowed absolute difference from *expected*,
+                as a :class:`~datetime.timedelta`.
+            expected: The target datetime.  Defaults to
+                ``datetime.now(timezone.utc)`` on each poll.  Naive
+                datetimes are treated as UTC.
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+
+        Returns:
+            The full item dict from DynamoDB.
+
+        Raises:
+            DynamoDBInvalidTimestampError: Immediately if *field* contains
+                a value that cannot be parsed as a timestamp.
+            DynamoDBWaitTimeoutError: After *timeout* if the item does not
+                exist, *field* is absent, or the timestamp does not
+                converge within *delta*.
+        """
+        delay = _compute_delay(poll_interval)
+        deadline = time.monotonic() + timeout
+        delta_seconds = delta.total_seconds()
+        timeout_message = (
+            f"Timed out after {timeout}s waiting for item {key} field '{field}'"
+            f" to be within {delta} of {expected or 'now(UTC)'}"
+            f" in table {self._table_name}"
+        )
+        last_item: dict[str, Any] | None = None
+
+        while True:
+            response = self._table.get_item(Key=key)
+            if (item := response.get("Item")) is not None:
+                last_item = item
+                if (value := item.get(field)) is not None:
+                    parsed = self._parse_timestamp(value)
+                    if parsed is None:
+                        raise DynamoDBInvalidTimestampError(
+                            self._table_name, key, field, value, timeout
+                        )
+                    target = (
+                        expected.replace(tzinfo=timezone.utc)
+                        if expected is not None and expected.tzinfo is None
+                        else expected
+                    )
+                    if target is None:
+                        target = datetime.now(timezone.utc)
+                    if self._is_datetime_close(parsed, target, delta_seconds):
                         return item
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -431,6 +525,39 @@ class DynamoDBItemExpectation:
     def _is_close(value: int | float | Decimal, expected: float, delta: float) -> bool:
         """Return True when ``abs(value - expected) <= delta``."""
         return abs(float(value) - expected) <= delta
+
+    @staticmethod
+    def _parse_timestamp(value: Any) -> datetime | None:
+        """Parse a DynamoDB field value into a timezone-aware UTC datetime.
+
+        Accepts:
+        - ``int``, ``float``, ``Decimal`` — Unix epoch seconds.
+        - ``str`` — ISO 8601 format.  Naive strings are treated as UTC.
+
+        Returns:
+            A timezone-aware :class:`~datetime.datetime` in UTC, or
+            ``None`` if the value cannot be parsed.
+        """
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float, Decimal)):
+            return datetime.fromtimestamp(float(value), tz=timezone.utc)
+        if isinstance(value, str):
+            try:
+                dt = datetime.fromisoformat(value)
+            except (ValueError, TypeError):
+                return None
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        return None
+
+    @staticmethod
+    def _is_datetime_close(
+        actual: datetime, expected: datetime, delta_seconds: float
+    ) -> bool:
+        """Return True when ``abs(actual - expected) <= delta_seconds``."""
+        return abs((actual - expected).total_seconds()) <= delta_seconds
 
 
 class DynamoDBTableExpectation:
