@@ -291,29 +291,17 @@ class DynamoDBItemExpectation:
             f" in table {self._table_name}"
         )
         last_item: dict[str, Any] | None = None
-        target: datetime | None = None
-        if expected is not None:
-            target = (
-                expected.replace(tzinfo=timezone.utc)
-                if expected.tzinfo is None
-                else expected
-            )
+        target = self._normalize_to_utc(expected) if expected else None
 
         while True:
-            response = self._table.get_item(Key=key)
-            if (item := response.get("Item")) is not None:
+            item = self._table.get_item(Key=key).get("Item")
+            if item is not None:
                 last_item = item
-                if (value := item.get(field)) is not None:
-                    parsed = self._parse_timestamp(value)
-                    if parsed is None:
-                        raise DynamoDBInvalidTimestampError(
-                            self._table_name, key, field, value, timeout
-                        )
-                    effective_target = (
-                        target if target is not None else datetime.now(timezone.utc)
-                    )
-                    if self._is_datetime_close(parsed, effective_target, delta_seconds):
-                        return item
+                if self._check_datetime_field(
+                    item, field, key, target, delta_seconds, timeout
+                ):
+                    return item
+
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise DynamoDBWaitTimeoutError(
@@ -645,6 +633,32 @@ class DynamoDBItemExpectation:
                 dt = dt.replace(tzinfo=timezone.utc)
             return dt
         return None
+
+    def _check_datetime_field(
+        self,
+        item: dict[str, Any],
+        field: str,
+        key: dict[str, Any],
+        target: datetime | None,
+        delta_seconds: float,
+        timeout: float,
+    ) -> bool:
+        value = item.get(field)
+        if value is None:
+            return False
+        parsed = self._parse_timestamp(value)
+        if parsed is None:
+            raise DynamoDBInvalidTimestampError(
+                self._table_name, key, field, value, timeout
+            )
+        effective_target = target or datetime.now(timezone.utc)
+        return self._is_datetime_close(parsed, effective_target, delta_seconds)
+
+    @staticmethod
+    def _normalize_to_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
 
     @staticmethod
     def _is_datetime_close(
