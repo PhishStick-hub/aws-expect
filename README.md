@@ -82,26 +82,6 @@ item = expect_dynamodb_item(table).to_exist(
 
 expect_dynamodb_item(table).to_not_exist(key={"pk": "order-123"}, timeout=10)
 
-# Scan table for an item matching entries
-from aws_expect import DynamoDBFindItemTimeoutError
-
-item = expect_dynamodb_item(table).to_find_item(
-    entries={"status": "pending"},
-    timeout=30,
-)
-
-# Assert no matching item exists after a delay
-from aws_expect import DynamoDBUnexpectedItemError
-
-expect_dynamodb_item(table).to_not_find_item({"status": "cancelled"}, delay=5)
-
-# Abort scan early with stop_when predicate
-item = expect_dynamodb_item(table).to_find_item(
-    entries={"status": "pending"},
-    stop_when=lambda item: item.get("status") == "failed",
-    timeout=60,
-)
-
 # Wait for a timestamp field to be close to a target datetime
 from datetime import datetime, timedelta, timezone
 
@@ -128,15 +108,36 @@ item = expect_dynamodb_item(table).to_have_datetime_close_to(
 from aws_expect import expect_dynamodb_table
 
 dynamodb = boto3.resource("dynamodb")
+table = dynamodb.Table("orders")
 
-description = expect_dynamodb_table(dynamodb, "orders").to_exist(timeout=30)
-expect_dynamodb_table(dynamodb, "orders").to_not_exist(timeout=30)
+description = expect_dynamodb_table(table).to_exist(timeout=30)
+expect_dynamodb_table(table).to_not_exist(timeout=30)
 
 # Wait for table to be empty (no items)
-expect_dynamodb_table(dynamodb, "orders").to_be_empty(timeout=30)
+expect_dynamodb_table(table).to_be_empty(timeout=30)
 
 # Wait for table to contain at least one item
-expect_dynamodb_table(dynamodb, "orders").to_be_not_empty(timeout=30)
+expect_dynamodb_table(table).to_be_not_empty(timeout=30)
+
+# Scan table for an item matching entries
+from aws_expect import DynamoDBFindItemTimeoutError
+
+item = expect_dynamodb_table(table).to_find_item(
+    entries={"status": "pending"},
+    timeout=30,
+)
+
+# Assert no matching item exists after a delay
+from aws_expect import DynamoDBUnexpectedItemError
+
+expect_dynamodb_table(table).to_not_find_item({"status": "cancelled"}, delay=5)
+
+# Abort scan early with stop_when predicate
+item = expect_dynamodb_table(table).to_find_item(
+    entries={"status": "pending"},
+    stop_when=lambda item: item.get("status") == "failed",
+    timeout=60,
+)
 ```
 
 ### SQS Message Waiting
@@ -261,7 +262,7 @@ except WaitTimeoutError:
 |----------|-------------|
 | `expect_s3(s3_object)` | Creates `S3ObjectExpectation` |
 | `expect_dynamodb_item(table)` | Creates `DynamoDBItemExpectation` |
-| `expect_dynamodb_table(dynamodb, table_name)` | Creates `DynamoDBTableExpectation` |
+| `expect_dynamodb_table(table)` | Creates `DynamoDBTableExpectation` |
 | `expect_sqs(queue)` | Creates `SQSQueueExpectation` |
 | `expect_lambda(lambda_client)` | Creates `LambdaFunctionExpectation` |
 | `expect_all(expectations)` | Runs expectations concurrently; accepts callables or `(fn, *args)` tuples; returns all results or raises |
@@ -285,8 +286,6 @@ except WaitTimeoutError:
 | `to_not_exist(key, timeout, poll_interval)` | Wait for item to be deleted |
 | `to_have_numeric_value_close_to(key, field, value, delta, timeout, poll_interval)` | Wait for a numeric field to be within delta of value |
 | `to_have_datetime_close_to(key, field, delta, expected, timeout, poll_interval)` | Wait for a timestamp field (epoch or ISO 8601) to be within *delta* of *expected* (defaults to `now(UTC)`) |
-| `to_find_item(entries, timeout, poll_interval, *, stop_when)` | Scan table until at least one item subset-matches `entries`; abort via `stop_when` |
-| `to_not_find_item(entries, delay)` | Assert no item matches `entries` after `delay` |
 
 ### DynamoDB Table (`DynamoDBTableExpectation`)
 
@@ -296,6 +295,8 @@ except WaitTimeoutError:
 | `to_not_exist(timeout, poll_interval)` | Wait for table to be deleted |
 | `to_be_empty(timeout, poll_interval)` | Wait for table to exist, be Active, and contain no items |
 | `to_be_not_empty(timeout, poll_interval)` | Wait for table to exist, be Active, and contain at least one item |
+| `to_find_item(entries, timeout, poll_interval, *, stop_when)` | Scan table until at least one item subset-matches `entries`; abort via `stop_when` |
+| `to_not_find_item(entries, delay)` | Assert no item matches `entries` after `delay` |
 
 ### SQS (`SQSQueueExpectation`)
 
