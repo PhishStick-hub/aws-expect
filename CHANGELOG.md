@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/PhishStick-hub/aws-expect/compare/v3.0.0...v3.0.1) (2026-05-31)
+
+
+### Documentation
+
+* **readme:** remove unused imports and redundant sections ([fb3b03d](https://github.com/PhishStick-hub/aws-expect/commit/fb3b03dca632791cd6749d4a82ec2b1d31da6d0f))
+* **readme:** update DynamoDB API after refactor ([055ad9a](https://github.com/PhishStick-hub/aws-expect/commit/055ad9a37c9354577691c5cc380191c5491b946c))
+
 ## [3.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v2.2.0...v3.0.0) (2026-05-31)
 
 
