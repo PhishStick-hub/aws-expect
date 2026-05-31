@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v2.2.0...v3.0.0) (2026-05-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **dynamodb:** DynamoDBTableExpectation now accepts Table resource instead of (resource, table_name)
+
+### Code Refactoring
+
+* **dynamodb:** separate item and table responsibilities ([3b1fed6](https://github.com/PhishStick-hub/aws-expect/commit/3b1fed61dfbec8719821ce389514c4df00d91297))
+
 ## [2.2.0](https://github.com/PhishStick-hub/aws-expect/compare/v2.1.0...v2.2.0) (2026-05-28)
 
 
