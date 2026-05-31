@@ -34,7 +34,7 @@ uv add aws-expect
 
 ```python
 import boto3
-from aws_expect import expect_s3, S3WaitTimeoutError
+from aws_expect import expect_s3
 
 s3 = boto3.resource("s3")
 obj = s3.Object("my-bucket", "report.csv")
@@ -45,18 +45,12 @@ print(f"Object exists! Size: {metadata['ContentLength']} bytes")
 expect_s3(obj).to_not_exist(timeout=10, poll_interval=2)
 
 # Wait for object body to be valid JSON that deep-matches expected content
-from aws_expect import S3ContentWaitTimeoutError
-
 body = expect_s3(obj).to_have_content({"status": "shipped"}, timeout=30)
 
 # Assert object body does NOT match after a delay
-from aws_expect import S3UnexpectedContentError
-
 expect_s3(obj).to_not_have_content({"status": "cancelled"}, delay=5)
 
 # Abort early with stop_when predicate
-from aws_expect import StopConditionMetError
-
 body = expect_s3(obj).to_exist(
     entries={"status": "shipped"},
     stop_when=lambda state: state.get("status") == "cancelled",
@@ -68,7 +62,7 @@ body = expect_s3(obj).to_exist(
 
 ```python
 import boto3
-from aws_expect import expect_dynamodb_item, DynamoDBWaitTimeoutError
+from aws_expect import expect_dynamodb_item
 
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table("orders")
@@ -120,16 +114,12 @@ expect_dynamodb_table(table).to_be_empty(timeout=30)
 expect_dynamodb_table(table).to_be_not_empty(timeout=30)
 
 # Scan table for an item matching entries
-from aws_expect import DynamoDBFindItemTimeoutError
-
 item = expect_dynamodb_table(table).to_find_item(
     entries={"status": "pending"},
     timeout=30,
 )
 
 # Assert no matching item exists after a delay
-from aws_expect import DynamoDBUnexpectedItemError
-
 expect_dynamodb_table(table).to_not_find_item({"status": "cancelled"}, delay=5)
 
 # Abort scan early with stop_when predicate
@@ -144,7 +134,7 @@ item = expect_dynamodb_table(table).to_find_item(
 
 ```python
 import boto3
-from aws_expect import expect_sqs, SQSWaitTimeoutError
+from aws_expect import expect_sqs
 
 sqs = boto3.resource("sqs")
 queue = sqs.Queue("https://sqs.us-east-1.amazonaws.com/123456789/my-queue")
@@ -176,7 +166,7 @@ expect_sqs(queue).to_not_have_event({"type": "ORDER_CREATED"}, delay=5)
 
 ```python
 import boto3
-from aws_expect import expect_lambda, LambdaWaitTimeoutError
+from aws_expect import expect_lambda
 
 lambda_client = boto3.client("lambda")
 
@@ -233,11 +223,6 @@ result = expect_any([
 results = expect_all([
     (expect_dynamodb_item(table_a).to_exist, {"pk": "a"}, 30, 1),
     (expect_dynamodb_item(table_b).to_exist, {"key": {"pk": "b"}, "timeout": 30}),
-])
-
-result = expect_any([
-    (expect_dynamodb_item(table_a).to_exist, {"pk": "u1"}, 30, 1),
-    (expect_dynamodb_item(table_b).to_exist, {"pk": "u1"}, 30, 1),
 ])
 ```
 
@@ -371,10 +356,3 @@ MIT License - see LICENSE file for details.
 ## Author
 
 Ivan Shcherbenko
-
-## Credits
-
-Built with:
-- [boto3](https://github.com/boto/boto3) — AWS SDK for Python
-- [testcontainers-python](https://github.com/testcontainers/testcontainers-python) — Testing with real services
-- [LocalStack](https://github.com/localstack/localstack) — Local AWS cloud stack
