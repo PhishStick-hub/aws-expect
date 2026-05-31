@@ -8,7 +8,7 @@ from aws_expect.s3 import S3ObjectExpectation
 from aws_expect.sqs import SQSQueueExpectation
 
 if TYPE_CHECKING:
-    from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource, Table
+    from mypy_boto3_dynamodb.service_resource import Table
     from mypy_boto3_lambda.client import LambdaClient
     from mypy_boto3_s3.service_resource import Object as S3Object
     from mypy_boto3_sqs.service_resource import Queue as SQSQueue
@@ -60,22 +60,21 @@ def expect_dynamodb_item(table: Table) -> DynamoDBItemExpectation:
     return DynamoDBItemExpectation(table)
 
 
-def expect_dynamodb_table(
-    dynamodb_resource: DynamoDBServiceResource, table_name: str
-) -> DynamoDBTableExpectation:
+def expect_dynamodb_table(table: Table) -> DynamoDBTableExpectation:
     """Create an expectation for a DynamoDB table.
 
     Use this to wait for a table to exist (and become ACTIVE) or to be
-    deleted.
+    deleted, and to perform table-level assertions such as emptiness
+    checks and item scans.
 
     Args:
-        dynamodb_resource: A boto3 DynamoDB resource
-            (``boto3.resource("dynamodb")``).
-        table_name: The name of the DynamoDB table to check.
+        table: A boto3 DynamoDB Table resource
+            (``boto3.resource("dynamodb").Table(name)``).
 
     Returns:
         A :class:`DynamoDBTableExpectation` that can be used to wait for
-        the table to exist or not exist.
+        the table to exist or not exist, and to perform scan-based
+        assertions.
 
     Example::
 
@@ -83,9 +82,10 @@ def expect_dynamodb_table(
         from aws_expect import expect_dynamodb_table
 
         dynamodb = boto3.resource("dynamodb")
-        description = expect_dynamodb_table(dynamodb, "my-table").to_exist(timeout=60)
+        table = dynamodb.Table("my-table")
+        description = expect_dynamodb_table(table).to_exist(timeout=60)
     """
-    return DynamoDBTableExpectation(dynamodb_resource, table_name)
+    return DynamoDBTableExpectation(table)
 
 
 def expect_lambda(lambda_client: LambdaClient) -> LambdaFunctionExpectation:

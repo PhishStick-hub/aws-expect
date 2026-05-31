@@ -17,12 +17,13 @@ CI runs: `ruff format --check` → `ruff check` → `ty check` → `pytest` (20 
 
 - **`aws_expect/expect.py`** — factory functions: `expect_s3`, `expect_dynamodb_item`, `expect_dynamodb_table`, `expect_sqs`, `expect_lambda`
 - **`aws_expect/s3.py`** — `S3ObjectExpectation`; native boto3 waiters for existence, custom polling for JSON content matching
-- **`aws_expect/dynamodb.py`** — `DynamoDBItemExpectation` (Table resource) + `DynamoDBTableExpectation` (dynamodb resource + table name)
+- **`aws_expect/dynamodb.py`** — `DynamoDBItemExpectation` (single-item `get_item` operations) + `DynamoDBTableExpectation` (table-level `describe_table` + `scan` operations); both accept a `Table` resource
 - **`aws_expect/sqs.py`** — `SQSQueueExpectation`; string-body methods + JSON event methods with deep subset matching via `_deep_matches`
 - **`aws_expect/lambda_function.py`** — `LambdaFunctionExpectation`; uses boto3 **client** (no resource API). `to_respond_with` is not a waiter — asserts immediately
 - **`aws_expect/parallel.py`** — `expect_all` / `expect_any`; `ThreadPoolExecutor`, accepts callables or `(fn, *args)` tuples
-- **`aws_expect/exceptions.py`** — hierarchy rooted at `WaitTimeoutError`; `LambdaResponseMismatchError`, `SQSUnexpectedMessageError`/`SQSUnexpectedEventError` inherit `Exception` directly (assertion failures, not timeouts)
-- **`aws_expect/__init__.py`** — public API via `__all__`; update when adding exports
+- **`aws_expect/_utils.py`** — shared internal helpers: `_matches_entries` (shallow subset), `_deep_matches` (recursive subset), `_format_timeout_error` (structured error messages), `_check_stop_condition` (stop_when predicate evaluation), `_truncate_value`, `_compute_delay`, `_build_waiter_config`
+- **`aws_expect/exceptions.py`** — hierarchy rooted at `WaitTimeoutError`; `LambdaResponseMismatchError`, `SQSUnexpectedMessageError`/`SQSUnexpectedEventError`, `S3UnexpectedContentError`, `S3ObjectAppearedError`, `DynamoDBUnexpectedItemError`, `DynamoDBNonNumericFieldError`, `DynamoDBInvalidTimestampError`, `StopConditionMetError`, `StopConditionError` inherit `Exception` directly (assertion failures, not timeouts)
+- **`aws_expect/__init__.py`** — public API via `__all__`; update when adding exports; version string lives here **and** in `pyproject.toml` — release-please manages both, never bump manually
 
 ## Testing gotchas
 
