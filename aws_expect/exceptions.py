@@ -391,8 +391,8 @@ class LambdaInvocableTimeoutError(LambdaWaitTimeoutError):
     Attributes:
         function_name: Name or ARN of the Lambda function.
         expected: The entries dict that was never matched.
-        actual: The last parsed response payload dict, or None if no invocation
-            produced a parseable response.
+        actual: The last parsed response payload (any JSON type), or None if no
+            invocation produced a parseable response.
         timeout: The timeout that was configured.
     """
 
@@ -400,7 +400,7 @@ class LambdaInvocableTimeoutError(LambdaWaitTimeoutError):
         self,
         function_name: str,
         expected: dict[str, Any],
-        actual: dict[str, Any] | None,
+        actual: Any,
         timeout: float,
     ) -> None:
         self.function_name = function_name
@@ -427,9 +427,22 @@ class LambdaResponseMismatchError(Exception):
     Attributes:
         function_name: Name or ARN of the Lambda function that was invoked.
         actual: The full parsed response payload that was returned, or None if
-            the function raised an error before a payload could be parsed.
+            the response could not be parsed.
+        reason: A string identifying which check failed.  Valid values:
+
+            * ``"invalid_status_code"`` — the invoke ``StatusCode`` was
+              neither 200 nor 202.
+            * ``"function_error"`` — the response contained ``FunctionError``.
+            * ``"empty_payload"`` — ``Payload.read()`` returned ``b""``.
+            * ``"invalid_json"`` — the payload bytes were non-empty but could
+              not be parsed as JSON.
+            * ``"invalid_payload_type"`` — the payload parsed to a non-dict
+              type (e.g. ``null``, a list, or a string).
+            * ``"payload_mismatch"`` — the ``statusCode`` or parsed ``body``
+              field did not match *expected_status* /*expected_payload*.
+
         expected_status: The status code the caller expected, or None if not checked.
-        expected_body: The body subset the caller expected, or None if not checked.
+        expected_payload: The body subset the caller expected, or None if not checked.
     """
 
     def __init__(
@@ -437,19 +450,22 @@ class LambdaResponseMismatchError(Exception):
         function_name: str,
         actual: dict[str, Any] | None,
         *,
+        reason: str,
         expected_status: int | None = None,
-        expected_body: dict[str, Any] | None = None,
+        expected_payload: dict[str, Any] | None = None,
     ) -> None:
         self.function_name = function_name
         self.actual = actual
+        self.reason = reason
         self.expected_status = expected_status
-        self.expected_body = expected_body
+        self.expected_payload = expected_payload
         parts: list[str] = []
+        parts.append(f"reason={reason!r}")
         if expected_status is not None:
             parts.append(f"expected_status={expected_status!r}")
-        if expected_body is not None:
-            parts.append(f"expected_body={expected_body!r}")
-        expected_desc = ", ".join(parts) if parts else "no expectations provided"
+        if expected_payload is not None:
+            parts.append(f"expected_payload={expected_payload!r}")
+        expected_desc = ", ".join(parts)
         super().__init__(
             f"Lambda function {function_name!r} response did not match expectations"
             f" ({expected_desc}); got actual={actual!r}"

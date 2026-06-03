@@ -145,6 +145,14 @@ def _error_handler(event, _context):
     raise RuntimeError("intentional error")
 
 
+def _empty_payload_handler(event, _context):
+    return None
+
+
+def _invalid_json_handler(event, _context):
+    return "not valid json {"
+
+
 def _json_body_handler(event, _context):
     import json  # noqa: PLC0415
 
@@ -235,6 +243,40 @@ def error_lambda_function(lambda_client: LambdaClient) -> Iterator[str]:
         Role=_LAMBDA_ROLE,
         Handler="handler.handler",
         Code={"ZipFile": _make_lambda_zip(_error_handler)},
+    )
+    lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)
+    yield function_name
+    with suppress(lambda_client.exceptions.ResourceNotFoundException):
+        lambda_client.delete_function(FunctionName=function_name)
+
+
+@pytest.fixture()
+def lambda_function_empty_payload(lambda_client: LambdaClient) -> Iterator[str]:
+    """Create a Lambda function returning None (delivered as JSON null)."""
+    function_name = f"test-empty-{uuid4().hex[:12]}"
+    lambda_client.create_function(
+        FunctionName=function_name,
+        Runtime="python3.13",
+        Role=_LAMBDA_ROLE,
+        Handler="handler.handler",
+        Code={"ZipFile": _make_lambda_zip(_empty_payload_handler)},
+    )
+    lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)
+    yield function_name
+    with suppress(lambda_client.exceptions.ResourceNotFoundException):
+        lambda_client.delete_function(FunctionName=function_name)
+
+
+@pytest.fixture()
+def lambda_function_invalid_json(lambda_client: LambdaClient) -> Iterator[str]:
+    """Create a Lambda function returning a non-JSON-parseable string."""
+    function_name = f"test-badj-{uuid4().hex[:12]}"
+    lambda_client.create_function(
+        FunctionName=function_name,
+        Runtime="python3.13",
+        Role=_LAMBDA_ROLE,
+        Handler="handler.handler",
+        Code={"ZipFile": _make_lambda_zip(_invalid_json_handler)},
     )
     lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)
     yield function_name

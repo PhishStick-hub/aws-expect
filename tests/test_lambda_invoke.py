@@ -84,3 +84,35 @@ class TestToBeInvocable:
             expect_lambda(lambda_client).to_be_invocable(
                 "nonexistent-fn", timeout=2, poll_interval=1
             )
+
+    def test_times_out_gracefully_when_handler_returns_null(
+        self, lambda_client: LambdaClient, lambda_function_empty_payload: str
+    ) -> None:
+        with pytest.raises(LambdaWaitTimeoutError) as exc_info:
+            expect_lambda(lambda_client).to_be_invocable(
+                lambda_function_empty_payload, timeout=2, poll_interval=1
+            )
+        assert exc_info.value.function_name == lambda_function_empty_payload
+
+    def test_times_out_gracefully_when_handler_returns_invalid_json(
+        self, lambda_client: LambdaClient, lambda_function_invalid_json: str
+    ) -> None:
+        with pytest.raises(LambdaWaitTimeoutError) as exc_info:
+            expect_lambda(lambda_client).to_be_invocable(
+                lambda_function_invalid_json, timeout=2, poll_interval=1
+            )
+        assert exc_info.value.function_name == lambda_function_invalid_json
+
+    def test_actual_is_none_when_handler_never_succeeds(
+        self, lambda_client: LambdaClient, error_lambda_function: str
+    ) -> None:
+        with pytest.raises(LambdaInvocableTimeoutError) as exc_info:
+            expect_lambda(lambda_client).to_be_invocable(
+                error_lambda_function,
+                timeout=2,
+                poll_interval=1,
+                entries={"statusCode": 200},
+            )
+        assert exc_info.value.function_name == error_lambda_function
+        assert exc_info.value.actual is None
+        assert exc_info.value.expected == {"statusCode": 200}
