@@ -194,8 +194,8 @@ from aws_expect import LambdaResponseMismatchError
 result = expect_lambda(lambda_client).to_respond_with(
     "my-function",
     status_code=200,
-    body={"message": "hello"},
-    payload={"key": "value"},
+    expected_payload={"message": "hello"},
+    request_payload={"key": "value"},
 )
 ```
 
@@ -303,7 +303,7 @@ except WaitTimeoutError:
 | `to_be_active(function_name, timeout, poll_interval)` | Wait for `State == "Active"` |
 | `to_be_updated(function_name, timeout, poll_interval)` | Wait for `LastUpdateStatus == "Successful"` |
 | `to_be_invocable(function_name, timeout, poll_interval, payload, entries)` | Wait until invocation succeeds; optionally match response payload entries |
-| `to_respond_with(function_name, status_code, body, payload)` | Invoke once and assert `statusCode` and/or JSON `body` (not a waiter) |
+| `to_respond_with(function_name, status_code, expected_payload, request_payload)` | Invoke once and assert `statusCode` and/or JSON `body` (not a waiter) |
 
 ## Exceptions
 
