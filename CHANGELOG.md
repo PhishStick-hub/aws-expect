@@ -1,5 +1,23 @@
 # Changelog
 
+## [4.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v3.0.0...v4.0.0) (2026-06-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **lambda:** `to_respond_with` parameter `body` renamed to `expected_payload`, `payload` renamed to `request_payload`. `LambdaResponseMismatchError` now requires `reason` kwarg and `expected_body` attribute renamed to `expected_payload`.
+
+### Documentation
+
+* **readme:** remove unused imports and redundant sections ([fb3b03d](https://github.com/PhishStick-hub/aws-expect/commit/fb3b03dca632791cd6749d4a82ec2b1d31da6d0f))
+* **readme:** update DynamoDB API after refactor ([055ad9a](https://github.com/PhishStick-hub/aws-expect/commit/055ad9a37c9354577691c5cc380191c5491b946c))
+* **readme:** update Lambda API after refactor ([7834e55](https://github.com/PhishStick-hub/aws-expect/commit/7834e55daa6d6cc7900b3f8ded18c4d9e9ac6d26))
+
+
+### Code Refactoring
+
+* **lambda:** rename body/payload params and add reason codes ([7343a0b](https://github.com/PhishStick-hub/aws-expect/commit/7343a0bd89afc4197d0ce34fdd4e2447a9c8a32e))
+
 ## [3.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v2.2.0...v3.0.0) (2026-05-31)
 
 
