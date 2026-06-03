@@ -208,17 +208,24 @@ class LambdaFunctionExpectation:
         if payload is not None:
             invoke_kwargs["Payload"] = json.dumps(payload).encode()
 
-        last_actual: dict[str, Any] | None = None
+        last_actual: Any = None
 
         while True:
             response = self._client.invoke(**invoke_kwargs)
             if not response.get("FunctionError"):
-                response_payload: dict[str, Any] = json.loads(
-                    response["Payload"].read()
-                )
-                if entries is None or _matches_entries(response_payload, entries):
-                    return response_payload
-                last_actual = response_payload
+                raw = response["Payload"].read()
+                if raw:
+                    try:
+                        response_payload: Any = json.loads(raw)
+                    except (ValueError, TypeError):
+                        response_payload = None
+                    else:
+                        last_actual = response_payload
+                    if isinstance(response_payload, dict):
+                        if entries is None or _matches_entries(
+                            response_payload, entries
+                        ):
+                            return response_payload
             else:
                 response["Payload"].read()  # drain to release the HTTP connection
 
@@ -236,82 +243,126 @@ class LambdaFunctionExpectation:
         function_name: str,
         *,
         status_code: int | None = None,
-        body: dict[str, Any] | None = None,
-        payload: dict[str, Any] | None = None,
+        expected_payload: dict[str, Any] | None = None,
+        request_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Invoke a Lambda function once and assert the expected status code and/or body.
+        """Invoke a Lambda function once and assert the expected response.
 
         Invokes the function a single time. Succeeds when the response has no
-        ``FunctionError``, ``statusCode`` matches *status_code* (if given), and the
-        JSON-parsed ``body`` field contains all entries in *body* (subset match, if given).
+        ``FunctionError``, the ``statusCode`` field matches *status_code*
+        (if given), and the JSON-parsed ``body`` field contains all entries
+        in *expected_payload* (subset match, if given).
 
         Args:
             function_name: Name or ARN of the Lambda function.
-            status_code: Expected value of ``statusCode`` in the response payload.
-            body: Expected key-value pairs in the JSON-parsed ``body`` field (subset match).
-            payload: Optional dict to send as the invocation event (JSON-serialized).
+            status_code: Expected value of the status field in the response payload.
+            expected_payload: Expected key-value pairs in the JSON-parsed ``body``
+                field (subset match).
+            request_payload: Optional dict to send as the invocation event
+                (JSON-serialized).
 
         Returns:
             The full parsed Lambda response payload dict on success.
 
         Raises:
             LambdaResponseMismatchError: If the response has a ``FunctionError`` or does
-                not match the expected *status_code* / *body*.
+                not match the expected *status_code* / *expected_payload*.
         """
-        if status_code is None and body is None:
-            raise ValueError("At least one of status_code or body must be provided.")
+        if status_code is None and expected_payload is None:
+            raise ValueError(
+                "At least one of status_code or expected_payload must be provided."
+            )
 
         invoke_kwargs: dict[str, Any] = {"FunctionName": function_name}
-        if payload is not None:
-            invoke_kwargs["Payload"] = json.dumps(payload).encode()
+        if request_payload is not None:
+            invoke_kwargs["Payload"] = json.dumps(request_payload).encode()
 
         response = self._client.invoke(**invoke_kwargs)
-        if response.get("FunctionError"):
+
+        invoke_status_code = response.get("StatusCode")
+        if invoke_status_code not in (200, 202):
+            response["Payload"].read()
             raise LambdaResponseMismatchError(
                 function_name,
                 None,
+                reason="invalid_status_code",
                 expected_status=status_code,
-                expected_body=body,
+                expected_payload=expected_payload,
             )
+
+        if response.get("FunctionError"):
+            response["Payload"].read()
+            raise LambdaResponseMismatchError(
+                function_name,
+                None,
+                reason="function_error",
+                expected_status=status_code,
+                expected_payload=expected_payload,
+            )
+
+        raw = response["Payload"].read()
+        if not raw:
+            raise LambdaResponseMismatchError(
+                function_name,
+                None,
+                reason="empty_payload",
+                expected_status=status_code,
+                expected_payload=expected_payload,
+            )
+
         try:
-            response_payload: dict[str, Any] = json.loads(response["Payload"].read())
+            response_payload: dict[str, Any] = json.loads(raw)
         except (ValueError, TypeError):
             raise LambdaResponseMismatchError(
                 function_name,
                 None,
+                reason="invalid_json",
                 expected_status=status_code,
-                expected_body=body,
+                expected_payload=expected_payload,
             )
-        if not self._matches_response(response_payload, status_code, body):
+
+        if not isinstance(response_payload, dict):
             raise LambdaResponseMismatchError(
                 function_name,
                 response_payload,
+                reason="invalid_payload_type",
                 expected_status=status_code,
-                expected_body=body,
+                expected_payload=expected_payload,
             )
+
+        if not self._matches_response(response_payload, status_code, expected_payload):
+            raise LambdaResponseMismatchError(
+                function_name,
+                response_payload,
+                reason="payload_mismatch",
+                expected_status=status_code,
+                expected_payload=expected_payload,
+            )
+
         return response_payload
 
     @staticmethod
     def _matches_response(
         payload: dict[str, Any],
         status_code: int | None,
-        body: dict[str, Any] | None,
+        expected_payload: dict[str, Any] | None,
     ) -> bool:
-        """Check that *payload* satisfies the expected *status_code* and *body*.
+        """Check that *payload* satisfies the expected *status_code* and *expected_payload*.
 
-        *body* is matched against the JSON-parsed ``body`` field of *payload*
-        using a deep recursive subset match. Returns ``False`` if the ``body`` field
-        is missing or not valid JSON when *body* entries are requested.
+        *expected_payload* is matched against the JSON-parsed ``body`` field of
+        *payload* using a deep recursive subset match. Returns ``False`` if the
+        ``body`` field is missing or not valid JSON when *expected_payload* entries
+        are requested.
         """
         if status_code is not None and payload.get("statusCode") != status_code:
             return False
-        if body is not None:
+        if expected_payload is not None:
             try:
                 parsed_body: dict[str, Any] = json.loads(payload.get("body", ""))
             except (ValueError, TypeError):
                 return False
             if not isinstance(parsed_body, dict):
                 return False
-            if not _deep_matches(parsed_body, body):
+            if not _deep_matches(parsed_body, expected_payload):
                 return False
         return True
