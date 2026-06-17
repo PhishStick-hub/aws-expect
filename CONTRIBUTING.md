@@ -31,10 +31,6 @@ We use a **single-branch strategy** with feature branches and automated releases
   - CI runs quality checks and integration tests on every push
   - Merged to `main` via Pull Request using [Conventional Commits](#version-numbering)
 
-- **`release/**`** — Pre-release testing
-  - Created from `main` (or a feature branch) when you want to publish a test build
-  - Every push auto-publishes to TestPyPI with a dev version derived from git commit count
-
 **Workflow diagram:**
 ```
 feature/xxx → PR (conventional commits) → main
@@ -43,16 +39,13 @@ feature/xxx → PR (conventional commits) → main
                                             ↓ (merge release PR)
                               GitHub Release + tag created
                                             ↓
-                                       PyPI (automatic)
-
-release/xxx → TestPyPI (automatic, version = BASE.devN)
+                                        PyPI (automatic)
 ```
 
 **Branch naming conventions:**
 - `feature/description` — New features
 - `fix/description` — Bug fixes
 - `chore/description` — Maintenance tasks
-- `release/description` — Pre-release testing branches (publish to TestPyPI)
 
 ---
 
@@ -87,65 +80,23 @@ release/xxx → TestPyPI (automatic, version = BASE.devN)
      --title "feat(scope): add new waiter for X"
    ```
 
-### Publishing a Test Build to TestPyPI
-
-If you want to install and test a pre-release build before merging:
-
-1. **Create a `release/` branch from your feature branch (or `main`):**
-   ```bash
-   git checkout -b release/your-feature-name
-   git push origin release/your-feature-name
-   # ✅ Automatically publishes to TestPyPI
-   ```
-
-2. **The dev version is computed automatically** from the base version in
-   `pyproject.toml` and the total git commit count:
-   ```
-   version = BASE.devN   # e.g., 0.7.0.dev142
-   ```
-   You never need to edit `pyproject.toml` manually for test builds.
-
-3. **Push additional commits to the same branch to publish a new test build:**
-   ```bash
-   git commit -m "fix: tweak something"
-   git push origin release/your-feature-name
-   # ✅ Publishes a new .devN+1 build automatically
-   ```
-
-4. **Install the test build:**
-   ```bash
-   pip install --index-url https://test.pypi.org/simple/ \
-     --extra-index-url https://pypi.org/simple/ \
-     aws-expect==0.7.0.dev142
-   ```
-
 ---
 
 ## CI/CD Overview
 
-### On every push (all branches)
+### On pull request to `main`
 
 | Job | Depends on | What it does |
 |-----|------------|--------------|
 | Quality Checks | — | `ruff format --check`, `ruff check`, `ty check` |
-| Integration Tests | Quality Checks | Full pytest suite (Docker/LocalStack), 20 min timeout |
-| Build | Quality Checks + Integration Tests | `uv build` (only when `run-build: true`) |
-
-### On push to `release/**`
-
-1. Full CI (quality checks + integration tests + build)
-2. If CI passes → compute `BASE.devN` version → publish to TestPyPI
-
-### On push to `main`
-
-1. Full CI
-2. release-please opens or updates a release PR (changelog + version bump)
+| Integration Tests | Quality Checks | Full pytest suite (Docker/LocalStack) + coverage, 20 min timeout |
+| Build | Quality Checks + Integration Tests | `uv build` + `twine check` (verifies package builds) |
 
 ### On merge of release-please PR to `main`
 
 1. release-please creates a GitHub Release and version tag
 2. Full CI + build runs against the tagged commit
-3. Package is published to PyPI automatically
+3. Package is published to PyPI automatically via OIDC trusted publishing
 
 ---
 
@@ -283,8 +234,9 @@ Releases are **fully automated** via [Release Please](https://github.com/googlea
    and a `vX.Y.Z` tag automatically.
 
 4. **The tag triggers `publish-pypi.yml`**, which runs full CI and publishes the
-   package to PyPI. No manual approval step is needed — the `pypi` environment
-   gate in GitHub provides the protection layer.
+   package to PyPI via OIDC trusted publishing (no API token required).
+   No manual approval step is needed — the `pypi` environment gate in GitHub
+   provides the protection layer.
 
 ### Hotfix Process
 
@@ -316,18 +268,6 @@ Versions follow **Semantic Versioning** and are managed automatically by release
 | `feat` | `feat(dynamodb): add batch waiter` | Minor (`0.6.1` → `0.7.0`) |
 | `feat!` / `BREAKING CHANGE` | `feat(s3)!: rename to_exist` | Major (`0.7.0` → `1.0.0`) |
 | `chore`, `docs`, `test`, `ci` | `chore(ci): update workflow` | No bump |
-
-### Dev versions (TestPyPI)
-
-Builds published to TestPyPI from `release/**` branches use auto-generated dev
-versions — you never edit `pyproject.toml` for these:
-
-```
-BASE.devN   # e.g., 0.7.0.dev142
-```
-
-Where `BASE` is the current version in `pyproject.toml` and `N` is the total
-git commit count on the branch.
 
 ---
 
