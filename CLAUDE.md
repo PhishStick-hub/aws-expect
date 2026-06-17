@@ -106,5 +106,5 @@ Tests use `testcontainers[localstack]` for a session-scoped LocalStack container
 - **Imports**: stdlib → third-party → local, absolute only
 - **Exceptions**: all timeout exceptions inherit `WaitTimeoutError`; use `raise NewError(...) from exc` for chaining
 - **Docstrings**: Google-style for public API methods
-- **Branching**: `feature/`, `fix/`, or `chore/` prefixes; every push to a feature branch auto-publishes a `.devN` version to TestPyPI
+- **Branching**: `feature/`, `fix/`, or `chore/` prefixes
 - **HTTP constants**: use `http.HTTPStatus` for status codes and `http.HTTPMethod` for method names in tests; skip for invalid sentinel values (e.g. `999`) and for Lambda handler source extracted via `inspect.getsource`

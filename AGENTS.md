@@ -42,4 +42,4 @@ CI runs: `ruff format --check` → `ruff check` → `ty check` → `pytest` (20 
 - Conventional Commits with scope: `feat(s3): ...`, `fix(dynamodb): ...`; breaking: `feat(s3)!: ...`
 - Never add AI tool attribution (Co-authored-by, "Generated with...") to commits or PRs
 - Google-style docstrings for public API; exceptions suffix `Error`, inherit `WaitTimeoutError`
-- Branches: `feature/`, `fix/`, `chore/` prefixes; `release/` for TestPyPI dev builds
+- Branches: `feature/`, `fix/`, `chore/` prefixes

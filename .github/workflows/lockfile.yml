@@ -2,6 +2,7 @@ name: Update uv.lock
 
 on:
   pull_request:
+    types: [opened, synchronize]
     branches: [main]
 
 jobs:
@@ -11,11 +12,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
         with:
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          cache-dependency-glob: "uv.lock"
       - run: uv lock
       - name: Commit uv.lock
         run: |
