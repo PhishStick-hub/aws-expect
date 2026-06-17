@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.1](https://github.com/PhishStick-hub/aws-expect/compare/v4.0.0...v4.0.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* **ci:** grant id-token:write in release-please for OIDC publish ([5bbc121](https://github.com/PhishStick-hub/aws-expect/commit/5bbc12195507b58b9040f2fa77a86abf1d0fb1c0))
+
 ## [4.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v3.0.0...v4.0.0) (2026-06-03)
 
 
