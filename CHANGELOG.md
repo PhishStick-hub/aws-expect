@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.0.2](https://github.com/PhishStick-hub/aws-expect/compare/v4.0.1...v4.0.2) (2026-06-20)
+
+
+### Bug Fixes
+
+* **ci:** inline publish job to avoid reusable-workflow OIDC restriction ([7f8f5f0](https://github.com/PhishStick-hub/aws-expect/commit/7f8f5f0cb0cca378126d721ad2a06cfaf401e11f))
+* **ci:** pin pypa publish to release/v1 as recommended by PyPA ([a2d5254](https://github.com/PhishStick-hub/aws-expect/commit/a2d5254ef571496ba168af01f32412a618ef40df))
+* **ci:** skip integration tests on release-please PRs ([c004b2d](https://github.com/PhishStick-hub/aws-expect/commit/c004b2decd9271eab56d23641cf55aca27ede824))
+
 ## [4.0.1](https://github.com/PhishStick-hub/aws-expect/compare/v4.0.0...v4.0.1) (2026-06-17)
 
 
