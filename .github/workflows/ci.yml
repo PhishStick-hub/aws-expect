@@ -14,3 +14,4 @@ jobs:
     uses: ./.github/workflows/_ci.yml
     with:
       run-build: ${{ github.event_name == 'pull_request' }}
+      skip-integration-tests: ${{ startsWith(github.head_ref, 'release-please--') }}

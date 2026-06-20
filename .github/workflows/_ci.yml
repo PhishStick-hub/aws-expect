@@ -13,6 +13,11 @@ on:
         required: false
         type: boolean
         default: false
+      skip-integration-tests:
+        description: 'Whether to skip integration tests'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -53,6 +58,7 @@ jobs:
 
   integration-tests:
     name: Integration Tests
+    if: ${{ !inputs.skip-integration-tests }}
     runs-on: ubuntu-latest
     needs: [quality-checks]
     timeout-minutes: 20
@@ -89,7 +95,7 @@ jobs:
 
   build:
     name: Build Package
-    if: ${{ inputs.run-build }}
+    if: ${{ inputs.run-build && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     needs: [quality-checks, integration-tests]
     steps:
