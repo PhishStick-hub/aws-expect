@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.1.0](https://github.com/PhishStick-hub/aws-expect/compare/v4.0.2...v4.1.0) (2026-07-18)
+
+
+### Features
+
+* **s3:** distinguish object-missing vs entries-mismatch on to_exist timeout ([84fa451](https://github.com/PhishStick-hub/aws-expect/commit/84fa4511ee36bd0b309e299de31721e0d3321c54))
+* **s3:** distinguish object-missing vs entries-mismatch on to_exist timeout ([4b4593c](https://github.com/PhishStick-hub/aws-expect/commit/4b4593cf099900ea310ad752b297848bc992047c))
+
 ## [4.0.2](https://github.com/PhishStick-hub/aws-expect/compare/v4.0.1...v4.0.2) (2026-06-20)
 
 
