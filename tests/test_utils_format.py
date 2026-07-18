@@ -62,11 +62,11 @@ class TestFormatTimeoutError:
         """Large expected values are truncated via _truncate_value."""
         result = _format_timeout_error(
             resource_desc="my-resource",
-            expected=list(range(100)),
+            expected=list(range(200)),
             actual=None,
             timeout=10.0,
         )
-        assert "... (50 more items not shown)" in result
+        assert "... (100 more items not shown)" in result
 
     def test_timeout_includes_seconds_suffix(self) -> None:
         """The timeout value appears with 's' suffix in the message."""

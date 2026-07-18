@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING, Any, Callable
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import WaiterConfigTypeDef
 
+_TRUNCATE_ITEM_LIMIT: int = 100
+_TRUNCATE_CHAR_LIMIT: int = 1000
+
 
 def _compute_delay(poll_interval: float) -> int:
     """Clamp poll_interval to a minimum of 1 second and round up."""
@@ -61,13 +64,13 @@ def _truncate_value(value: Any) -> str:
 
     Rules:
     - ``None`` → ``"None"``
-    - ``list``/``tuple`` with ≤ 50 items → ``repr(value)``
-    - ``list``/``tuple`` with > 50 items → ``repr(first_50)`` +
+    - ``list``/``tuple`` with ≤ 100 items → ``repr(value)``
+    - ``list``/``tuple`` with > 100 items → ``repr(first_100)`` +
       ``"\\n... (N more items not shown)"``
-    - All other types where ``len(repr(value))`` ≤ 500 → ``repr(value)``
-    - All other types where ``len(repr(value))`` > 500 →
-      ``repr(value)[:500]`` +
-      ``"\\n... (value truncated, showing first 500 of NNNN chars)"``
+    - All other types where ``len(repr(value))`` ≤ 1000 → ``repr(value)``
+    - All other types where ``len(repr(value))`` > 1000 →
+      ``repr(value)[:1000]`` +
+      ``"\\n... (value truncated, showing first 1000 of NNNN chars)"``
 
     Args:
         value: Any value to format for display in an error message.
@@ -79,22 +82,25 @@ def _truncate_value(value: Any) -> str:
         return "None"
 
     if isinstance(value, (list, tuple)):
-        if len(value) > 50:
+        if len(value) > _TRUNCATE_ITEM_LIMIT:
             rendered = repr(
-                list(value[:50]) if isinstance(value, tuple) else value[:50]
+                list(value[:_TRUNCATE_ITEM_LIMIT])
+                if isinstance(value, tuple)
+                else value[:_TRUNCATE_ITEM_LIMIT]
             )
-            remaining = len(value) - 50
+            remaining = len(value) - _TRUNCATE_ITEM_LIMIT
             return f"{rendered}\n... ({remaining} more items not shown)"
         return repr(value)
 
     rendered = repr(value)
-    if len(rendered) <= 500:
+    if len(rendered) <= _TRUNCATE_CHAR_LIMIT:
         return rendered
 
     total_len = len(rendered)
     return (
-        f"{rendered[:500]}\n"
-        f"... (value truncated, showing first 500 of {total_len} chars)"
+        f"{rendered[:_TRUNCATE_CHAR_LIMIT]}\n"
+        f"... (value truncated, showing first {_TRUNCATE_CHAR_LIMIT}"
+        f" of {total_len} chars)"
     )
 
 
