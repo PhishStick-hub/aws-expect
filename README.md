@@ -311,7 +311,8 @@ All timeout exceptions inherit from `WaitTimeoutError`:
 
 | Exception | Raised by |
 |-----------|-----------|
-| `S3WaitTimeoutError` | S3 existence methods |
+| `S3WaitTimeoutError` | S3 existence methods (no `entries`) |
+| `S3EntriesWaitTimeoutError` | `to_exist(entries=...)` (subclass of `S3WaitTimeoutError`) |
 | `S3ContentWaitTimeoutError` | `to_have_content` |
 | `S3UnexpectedContentError` | `to_not_have_content` (not a timeout) |
 | `DynamoDBWaitTimeoutError` | DynamoDB methods |

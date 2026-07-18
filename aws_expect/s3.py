@@ -15,6 +15,7 @@ from aws_expect._utils import (
 )
 from aws_expect.exceptions import (
     S3ContentWaitTimeoutError,
+    S3EntriesWaitTimeoutError,
     S3ObjectAppearedError,
     S3UnexpectedContentError,
     S3WaitTimeoutError,
@@ -88,7 +89,16 @@ class S3ObjectExpectation:
             ``head_object`` metadata dict (no *entries*) or parsed JSON body.
 
         Raises:
-            S3WaitTimeoutError: Object does not exist or match within *timeout*.
+            S3WaitTimeoutError: Object does not exist within *timeout*
+                (when *entries* is None).
+            S3EntriesWaitTimeoutError: *entries* provided and the object did
+                not exist, was not readable as a JSON object, or its body
+                did not contain the shallow subset within *timeout*. Subclass
+                of S3WaitTimeoutError, so callers catching S3WaitTimeoutError
+                or WaitTimeoutError still catch it. The ``actual`` attribute
+                is None when the object was never readable as a JSON object
+                during polling, and the last parsed JSON object body
+                otherwise.
             StopConditionMetError: *stop_when* returns a truthy value.
             StopConditionError: *stop_when* raises an exception.
             TypeError: *stop_when* provided without *entries*.
@@ -149,18 +159,32 @@ class S3ObjectExpectation:
         """Poll ``get_object``, parse JSON, and wait for a subset match.
 
         Args:
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between polls (minimum 1).
+            entries: Expected key-value pairs for a shallow subset match.
             stop_when: Optional callable evaluated after entries mismatch.
                 Receives a shallow-copied state dict. Returns ``True`` or a
                 string reason to abort polling early via StopConditionMetError.
+
+        Raises:
+            S3EntriesWaitTimeoutError: Object missing or its body did not
+                contain the shallow subset *entries* within *timeout*. The
+                ``actual`` attribute is None if the object was never readable
+                as a JSON object during polling (missing, non-JSON, or
+                non-dict JSON), and the last parsed JSON object body
+                otherwise. Subclass of S3WaitTimeoutError.
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
         start = time.monotonic()
+        last_body: dict[str, Any] | None = None
 
         while True:
             body = self._fetch_body()
-            if body is not None and _matches_entries(body, entries):
-                return body
+            if body is not None:
+                last_body = body
+                if _matches_entries(body, entries):
+                    return body
 
             if body is not None and stop_when is not None:
                 resource_id = f"s3://{self._bucket}/{self._key}"
@@ -168,7 +192,9 @@ class S3ObjectExpectation:
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise S3WaitTimeoutError(self._bucket, self._key, timeout)
+                raise S3EntriesWaitTimeoutError(
+                    self._bucket, self._key, entries, last_body, timeout
+                )
             time.sleep(min(delay, remaining))
 
     def to_have_content(

@@ -135,6 +135,54 @@ class S3ContentWaitTimeoutError(S3WaitTimeoutError):
         )
 
 
+class S3EntriesWaitTimeoutError(S3WaitTimeoutError):
+    """Raised when to_exist(entries=...) times out.
+
+    Distinguishes two failure modes via the *actual* attribute:
+
+    * ``actual is None`` — the object was missing, non-JSON, or parsed to a
+      non-dict JSON value (e.g. a list / string / number / ``null``)
+      throughout the polling window.
+    * ``actual`` is a dict — the object existed and parsed as a JSON object,
+      but its body did not contain the shallow subset described by *expected*.
+
+    Inherits S3WaitTimeoutError so callers catching S3WaitTimeoutError or
+    WaitTimeoutError still catch it.
+
+    Attributes:
+        bucket: S3 bucket name.
+        key: S3 object key.
+        expected: The shallow subset dict that was never matched.
+        actual: The last parsed JSON object body seen during polling, or
+            None if the object was never readable as a JSON object during
+            the polling window (missing, non-JSON, or non-dict JSON).
+        timeout: The timeout that was configured for the wait operation.
+    """
+
+    def __init__(
+        self,
+        bucket: str,
+        key: str,
+        expected: dict[str, Any],
+        actual: dict[str, Any] | None,
+        timeout: float,
+    ) -> None:
+        self.bucket = bucket
+        self.key = key
+        self.expected = expected
+        self.actual = actual
+        self.timeout = timeout
+        WaitTimeoutError.__init__(
+            self,
+            _format_timeout_error(
+                f"s3://{bucket}/{key} to have matching entries",
+                expected,
+                actual,
+                timeout,
+            ),
+        )
+
+
 class S3UnexpectedContentError(Exception):
     """Raised when to_not_have_content finds the object body matches entries.
 

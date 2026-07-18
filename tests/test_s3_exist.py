@@ -4,7 +4,7 @@ import threading
 import pytest
 from mypy_boto3_s3.service_resource import S3ServiceResource
 
-from aws_expect import S3WaitTimeoutError, expect_s3
+from aws_expect import S3EntriesWaitTimeoutError, S3WaitTimeoutError, expect_s3
 
 
 class TestToExist:
@@ -95,12 +95,88 @@ class TestToExist:
         )
 
         obj = s3_resource.Object(test_bucket, key)
-        with pytest.raises(S3WaitTimeoutError):
+        with pytest.raises(S3EntriesWaitTimeoutError) as exc_info:
             expect_s3(obj).to_exist(
                 entries={"status": "shipped"},
                 timeout=2,
                 poll_interval=1,
             )
+
+        err = exc_info.value
+        assert err.bucket == test_bucket
+        assert err.key == key
+        assert err.timeout == 2
+        assert err.expected == {"status": "shipped"}
+        assert err.actual == {"status": "pending"}
+        # Backwards-compat: still catchable via base classes.
+        assert isinstance(err, S3WaitTimeoutError)
+        msg = str(err)
+        assert "Expected:" in msg
+        assert "Actual:" in msg
+        assert "'status': 'shipped'" in msg
+        assert "'status': 'pending'" in msg
+
+    def test_raises_timeout_when_object_missing_with_entries(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
+        key = "absent.json"
+        obj = s3_resource.Object(test_bucket, key)
+
+        with pytest.raises(S3EntriesWaitTimeoutError) as exc_info:
+            expect_s3(obj).to_exist(
+                entries={"x": 1},
+                timeout=2,
+                poll_interval=1,
+            )
+
+        err = exc_info.value
+        assert err.bucket == test_bucket
+        assert err.key == key
+        assert err.timeout == 2
+        assert err.expected == {"x": 1}
+        assert err.actual is None
+        msg = str(err)
+        assert "Expected:" in msg
+        assert "Actual:" not in msg
+
+    def test_raises_timeout_with_entries_when_body_non_json(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
+        key = "plain.txt"
+        s3_resource.Object(test_bucket, key).put(Body=b"not json")
+
+        obj = s3_resource.Object(test_bucket, key)
+        with pytest.raises(S3EntriesWaitTimeoutError) as exc_info:
+            expect_s3(obj).to_exist(
+                entries={"x": 1},
+                timeout=2,
+                poll_interval=1,
+            )
+
+        err = exc_info.value
+        assert err.expected == {"x": 1}
+        assert err.actual is None
+        msg = str(err)
+        assert "Expected:" in msg
+        assert "Actual:" not in msg
+
+    def test_raises_timeout_with_entries_when_body_non_dict_json(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
+        key = "array.json"
+        s3_resource.Object(test_bucket, key).put(Body=json.dumps([1, 2, 3]).encode())
+
+        obj = s3_resource.Object(test_bucket, key)
+        with pytest.raises(S3EntriesWaitTimeoutError) as exc_info:
+            expect_s3(obj).to_exist(
+                entries={"x": 1},
+                timeout=2,
+                poll_interval=1,
+            )
+
+        err = exc_info.value
+        assert err.expected == {"x": 1}
+        assert err.actual is None
 
     def test_succeeds_when_entries_match_after_update(
         self, s3_resource: S3ServiceResource, test_bucket: str
