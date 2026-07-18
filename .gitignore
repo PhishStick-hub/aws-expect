@@ -19,3 +19,8 @@ htmlcov/
 
 # Planning artifacts (local only)
 .planning/
+
+# Node (not part of this project)
+node_modules/
+package.json
+package-lock.json

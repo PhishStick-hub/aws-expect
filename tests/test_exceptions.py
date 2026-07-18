@@ -11,6 +11,7 @@ from aws_expect.exceptions import (
     LambdaInvocableTimeoutError,
     LambdaWaitTimeoutError,
     S3ContentWaitTimeoutError,
+    S3EntriesWaitTimeoutError,
     S3WaitTimeoutError,
     SQSEventWaitTimeoutError,
     SQSWaitTimeoutError,
@@ -131,6 +132,41 @@ class TestS3ContentWaitTimeoutErrorStr:
         msg = str(e)
         assert "Expected:" in msg
         assert "Actual:" not in msg
+
+
+class TestS3EntriesWaitTimeoutErrorStr:
+    """ERR-02: S3EntriesWaitTimeoutError __str__ shows Expected:/Actual:."""
+
+    def test_shows_expected_and_actual(self) -> None:
+        e = S3EntriesWaitTimeoutError(
+            "b", "k", {"status": "ok"}, {"status": "err"}, 10.0
+        )
+        msg = str(e)
+        assert "Timed out after 10.0s" in msg
+        assert "s3://b/k to have matching entries" in msg
+        assert "Expected:" in msg
+        assert "Actual:" in msg
+        assert "'status': 'ok'" in msg
+        assert "'status': 'err'" in msg
+
+    def test_actual_none_shows_only_expected(self) -> None:
+        e = S3EntriesWaitTimeoutError("b", "k", {"x": 1}, None, 10.0)
+        msg = str(e)
+        assert "Expected:" in msg
+        assert "Actual:" not in msg
+
+    def test_is_s3_wait_timeout_error_subclass(self) -> None:
+        e = S3EntriesWaitTimeoutError("b", "k", {"x": 1}, None, 10.0)
+        assert isinstance(e, S3WaitTimeoutError)
+        assert isinstance(e, WaitTimeoutError)
+
+    def test_attrs_exposed(self) -> None:
+        e = S3EntriesWaitTimeoutError("bkt", "obj", {"a": 1}, {"a": 2}, 7.0)
+        assert e.bucket == "bkt"
+        assert e.key == "obj"
+        assert e.expected == {"a": 1}
+        assert e.actual == {"a": 2}
+        assert e.timeout == 7.0
 
 
 class TestDynamoDBWaitTimeoutErrorStr:
