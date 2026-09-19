@@ -1,5 +1,16 @@
 # Changelog
 
+## [6.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v5.0.0...v6.0.0) (2026-09-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Python 3.13 is no longer supported; minimum is 3.14.
+
+### Features
+
+* **deps:** drop Python 3.13, require Python 3.14 ([271cf27](https://github.com/PhishStick-hub/aws-expect/commit/271cf275f792dab906e625e519296c464ea05962))
+
 ## [5.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v4.1.0...v5.0.0) (2026-09-19)
 
 
