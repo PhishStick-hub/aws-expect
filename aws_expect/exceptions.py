@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from aws_expect._utils import _format_timeout_error
+from aws_expect._utils import _format_timeout_error, _truncate_value
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef
@@ -37,12 +37,17 @@ class StopConditionMetError(Exception):
 
     Signals that polling should stop immediately because the stop condition
     was satisfied.  Does **not** inherit :class:`WaitTimeoutError` — this is
-    a deliberate stop, not a timeout.
+    a deliberate stop, not a timeout.  The message names the fired condition
+    without "timeout" framing: a bare ``True`` result gives a plain header,
+    while a ``str`` or ``dict`` reason returned by the predicate is rendered
+    as the suffix.
 
     Attributes:
         resource_id: Identifier for the resource being polled
             (e.g. ``s3://bucket/key``).
-        stop_reason: The string reason returned by the predicate.
+        stop_reason: The reason returned by the predicate: the rendered
+            ``str`` / ``dict`` payload, or ``None`` when the predicate
+            returned a bare ``True``.
         elapsed: Seconds elapsed since polling started.
         timeout: The configured timeout (seconds) that was not exceeded.
     """
@@ -50,7 +55,7 @@ class StopConditionMetError(Exception):
     def __init__(
         self,
         resource_id: str,
-        stop_reason: str,
+        stop_reason: str | dict[str, Any] | None,
         elapsed: float,
         timeout: float,
     ) -> None:
@@ -58,10 +63,10 @@ class StopConditionMetError(Exception):
         self.stop_reason = stop_reason
         self.elapsed = elapsed
         self.timeout = timeout
-        super().__init__(
-            f"assert stop condition not met for {resource_id!r} after {elapsed:.1f}s "
-            f"of {timeout:.1f}s timeout: {stop_reason!r}"
-        )
+        message = f"Stop condition met for {resource_id!r} after {elapsed:.1f}s"
+        if stop_reason is not None:
+            message += f": {_truncate_value(stop_reason)}"
+        super().__init__(message)
 
 
 class StopConditionError(Exception):
@@ -241,31 +246,41 @@ class S3ObjectAppearedError(Exception):
 
 
 class DynamoDBWaitTimeoutError(WaitTimeoutError):
-    """Raised when a DynamoDB wait operation exceeds the specified timeout."""
+    """Raised when a DynamoDB wait operation exceeds the specified timeout.
+
+    Attributes:
+        table_name: Name of the DynamoDB table.
+        key: Primary key dict used to look up the item, or ``None`` for
+            table-level operations.
+        timeout: The timeout that was configured for the wait operation.
+        resource_desc: The ``waiting for ...`` description used in the header,
+            or ``None`` when a default was derived from *table_name*/*key*.
+        expected: What the waiter expected to find, or ``None``.
+        actual: What was actually observed (last seen), or ``None``.
+    """
 
     def __init__(
         self,
         table_name: str,
         key: dict[str, str] | None,
         timeout: float,
-        message: str | None = None,
+        resource_desc: str | None = None,
         expected: dict[str, Any] | None = None,
         actual: dict[str, Any] | None = None,
     ) -> None:
         self.table_name = table_name
         self.key = key
         self.timeout = timeout
+        self.resource_desc = resource_desc
         self.expected = expected
         self.actual = actual
-        if message is not None:
-            actual_fmt = repr(actual) if actual is not None else "None"
-            msg = f"{message}\n\nActual (last seen):\n  {actual_fmt}"
-        else:
+        if resource_desc is None:
             resource_desc = (
                 f"item {key} in table {table_name}" if key else f"table {table_name}"
             )
-            msg = _format_timeout_error(resource_desc, expected, actual, timeout)
-        super().__init__(msg)
+        super().__init__(
+            _format_timeout_error(resource_desc, expected, actual, timeout)
+        )
 
 
 class DynamoDBFindItemTimeoutError(DynamoDBWaitTimeoutError):
@@ -290,15 +305,17 @@ class DynamoDBFindItemTimeoutError(DynamoDBWaitTimeoutError):
         actual: list[dict[str, Any]] | None,
         timeout: float,
     ) -> None:
+        resource_desc = f"a matching item in table {table_name}"
         self.table_name = table_name
         self.expected = expected
         self.actual = actual
         self.timeout = timeout
         self.key = None
+        self.resource_desc = resource_desc
         WaitTimeoutError.__init__(
             self,
             _format_timeout_error(
-                f"an item matching {expected!r} in table {table_name}",
+                resource_desc,
                 expected,
                 actual,
                 timeout,

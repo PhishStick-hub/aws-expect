@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from aws_expect._utils import (
+    _StopWhen,
     _check_stop_condition,
     _compute_delay,
     _deep_matches,
@@ -47,6 +48,17 @@ class DynamoDBItemExpectation:
         params = "&".join(f"{k}={v}" for k, v in sorted(key.items()))
         return f"{base}?{params}"
 
+    def _field_resource_desc(self, key: dict[str, Any], field: str) -> str:
+        """Build the ``waiting for ...`` header description for an item field."""
+        return f"item {key} field '{field}' in table {self._table_name}"
+
+    @staticmethod
+    def _field_expected_section(
+        field: str, expected: Any, delta: Any
+    ) -> dict[str, Any]:
+        """Build the ``Expected:`` section dict for field-convergence waiters."""
+        return {"field": field, "expected": expected, "delta": delta}
+
     def to_exist(
         self,
         key: dict[str, Any],
@@ -54,7 +66,7 @@ class DynamoDBItemExpectation:
         poll_interval: float = 5,
         entries: dict[str, Any] | None = None,
         *,
-        stop_when: Callable[[dict[str, Any]], bool | str] | None = None,
+        stop_when: _StopWhen = None,
     ) -> dict[str, Any]:
         """Poll until item exists and optionally matches *entries* (shallow match).
 
@@ -63,8 +75,10 @@ class DynamoDBItemExpectation:
             timeout: Maximum seconds to wait.
             poll_interval: Seconds between polls (minimum 1).
             entries: Optional shallow subset match.
-            stop_when: Keyword-only. Abort early if callable returns truthy.
-                Requires *entries*.
+            stop_when: Keyword-only. Predicate over the current item
+                state; a truthy return aborts early via
+                :class:`StopConditionMetError`, whose ``stop_reason``
+                carries a ``str``/``dict`` return. Requires *entries*.
 
         Returns:
             Full item dict.
@@ -151,10 +165,8 @@ class DynamoDBItemExpectation:
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
-        timeout_message = (
-            f"Timed out after {timeout}s waiting for item {key} field '{field}'"
-            f" to be within {delta} of {expected} in table {self._table_name}"
-        )
+        resource_desc = self._field_resource_desc(key, field)
+        expected_section = self._field_expected_section(field, expected, delta)
         last_item: dict[str, Any] | None = None
 
         while True:
@@ -174,7 +186,8 @@ class DynamoDBItemExpectation:
                     self._table_name,
                     key,
                     timeout,
-                    message=timeout_message,
+                    resource_desc=resource_desc,
+                    expected=expected_section,
                     actual=last_item,
                 )
             time.sleep(min(delay, remaining))
@@ -225,10 +238,9 @@ class DynamoDBItemExpectation:
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
         delta_seconds = delta.total_seconds()
-        timeout_message = (
-            f"Timed out after {timeout}s waiting for item {key} field '{field}'"
-            f" to be within {delta} of {expected or 'now(UTC)'}"
-            f" in table {self._table_name}"
+        resource_desc = self._field_resource_desc(key, field)
+        expected_section = self._field_expected_section(
+            field, expected if expected is not None else "now(UTC)", delta
         )
         last_item: dict[str, Any] | None = None
         target = self._normalize_to_utc(expected) if expected else None
@@ -248,7 +260,8 @@ class DynamoDBItemExpectation:
                     self._table_name,
                     key,
                     timeout,
-                    message=timeout_message,
+                    resource_desc=resource_desc,
+                    expected=expected_section,
                     actual=last_item,
                 )
             time.sleep(min(delay, remaining))
@@ -401,10 +414,7 @@ class DynamoDBTableExpectation:
                     self._table_name,
                     key=None,
                     timeout=timeout,
-                    message=(
-                        f"Timed out after {timeout}s waiting for table "
-                        f"{self._table_name} to exist"
-                    ),
+                    resource_desc=f"table {self._table_name} to exist",
                 )
             time.sleep(min(delay, remaining))
 
@@ -440,10 +450,7 @@ class DynamoDBTableExpectation:
                     self._table_name,
                     key=None,
                     timeout=timeout,
-                    message=(
-                        f"Timed out after {timeout}s waiting for table "
-                        f"{self._table_name} to not exist"
-                    ),
+                    resource_desc=f"table {self._table_name} to not exist",
                 )
             time.sleep(min(delay, remaining))
 
@@ -501,7 +508,7 @@ class DynamoDBTableExpectation:
         timeout: float = 30,
         poll_interval: float = 5,
         *,
-        stop_when: Callable[[dict[str, Any]], bool | str] | None = None,
+        stop_when: _StopWhen = None,
     ) -> dict[str, Any]:
         """Scan table until an item deep-matches *entries*.
 
@@ -511,7 +518,10 @@ class DynamoDBTableExpectation:
             entries: Subset dict for recursive deep matching.
             timeout: Maximum seconds to wait.
             poll_interval: Seconds between polls (minimum 1).
-            stop_when: Keyword-only. Abort early if callable returns truthy.
+            stop_when: Keyword-only. Predicate over each scanned item;
+                a truthy return aborts early via
+                :class:`StopConditionMetError`, whose ``stop_reason``
+                carries a ``str``/``dict`` return.
 
         Returns:
             First matching item dict.
@@ -636,9 +646,6 @@ class DynamoDBTableExpectation:
                     self._table_name,
                     key=None,
                     timeout=timeout,
-                    message=(
-                        f"Timed out after {timeout}s waiting for table "
-                        f"{self._table_name} to be {label}"
-                    ),
+                    resource_desc=f"table {self._table_name} to be {label}",
                 )
             time.sleep(min(delay, remaining))

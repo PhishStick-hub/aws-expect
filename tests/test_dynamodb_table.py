@@ -40,6 +40,12 @@ class TestDynamoDBTableToExist:
         assert exc_info.value.table_name == table_name
         assert exc_info.value.key is None
         assert exc_info.value.timeout == 2
+        msg = str(exc_info.value)
+        assert msg.startswith(
+            f"Timed out after 2s waiting for table {table_name} to exist"
+        )
+        assert "Expected:" not in msg
+        assert "Actual:" not in msg
 
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource
@@ -102,6 +108,12 @@ class TestDynamoDBTableToNotExist:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key is None
         assert exc_info.value.timeout == 2
+        msg = str(exc_info.value)
+        assert msg.startswith(
+            f"Timed out after 2s waiting for table {dynamodb_table.name} to not exist"
+        )
+        assert "Expected:" not in msg
+        assert "Actual:" not in msg
 
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
@@ -170,6 +182,10 @@ class TestDynamoDBTableToBeEmpty:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key is None
         assert exc_info.value.timeout == 2
+        msg = str(exc_info.value)
+        assert msg.startswith(
+            f"Timed out after 2s waiting for table {dynamodb_table.name} to be empty"
+        )
 
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
@@ -237,6 +253,10 @@ class TestDynamoDBTableToBeNotEmpty:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key is None
         assert exc_info.value.timeout == 2
+        msg = str(exc_info.value)
+        assert msg.startswith(
+            f"Timed out after 2s waiting for table {dynamodb_table.name} to be not empty"
+        )
 
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
@@ -291,7 +311,7 @@ class TestToFindItemStopWhen:
                 timeout=5,
                 poll_interval=1,
             )
-        assert exc_info.value.stop_reason == "stop condition met"
+        assert exc_info.value.stop_reason is None
         assert exc_info.value.resource_id == f"dynamodb://{dynamodb_table.name}"
 
     def test_stop_when_does_not_fire_on_matching_item(
@@ -320,6 +340,17 @@ class TestToFindItemStopWhen:
                 poll_interval=1,
             )
         assert exc_info.value.stop_reason == "found error: timeout"
+
+    def test_stop_when_dict_return_used_as_reason(self, dynamodb_table: Table) -> None:
+        dynamodb_table.put_item(Item={"pk": "z", "error_code": 500, "status": "bad"})
+        with pytest.raises(StopConditionMetError) as exc_info:
+            expect_dynamodb_table(dynamodb_table).to_find_item(
+                entries={"status": "ok"},
+                stop_when=lambda s: {"error": s["status"], "code": s["error_code"]},
+                timeout=5,
+                poll_interval=1,
+            )
+        assert exc_info.value.stop_reason == {"error": "bad", "code": 500}
 
     def test_predicate_raises_valueerror_wraps_in_stop_condition_error(
         self, dynamodb_table: Table

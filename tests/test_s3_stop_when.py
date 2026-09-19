@@ -10,7 +10,7 @@ from aws_expect import StopConditionError, StopConditionMetError, expect_s3
 class TestToExistStopWhen:
     """Tests for expect_s3(s3_object).to_exist(entries=..., stop_when=...)."""
 
-    def test_stop_when_returns_true_aborts_with_default_reason(
+    def test_stop_when_returns_true_aborts_without_reason(
         self, s3_resource: S3ServiceResource, test_bucket: str
     ) -> None:
         key = "test-key-true"
@@ -26,7 +26,7 @@ class TestToExistStopWhen:
                 poll_interval=1,
             )
         assert exc_info.value.resource_id == f"s3://{test_bucket}/{key}"
-        assert exc_info.value.stop_reason == "stop condition met"
+        assert exc_info.value.stop_reason is None
         assert exc_info.value.elapsed >= 0
         assert exc_info.value.timeout == 5
 
@@ -46,6 +46,25 @@ class TestToExistStopWhen:
                 poll_interval=1,
             )
         assert exc_info.value.stop_reason == "status is failed"
+
+    def test_stop_when_returns_dict_uses_it_as_reason(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
+        key = "test-key-dict"
+        s3_resource.Object(test_bucket, key).put(
+            Body=json.dumps({"status": "failed", "code": 500}).encode()
+        )
+        obj = s3_resource.Object(test_bucket, key)
+        with pytest.raises(StopConditionMetError) as exc_info:
+            expect_s3(obj).to_exist(
+                entries={"status": "active"},
+                stop_when=lambda s: {"status": s["status"], "code": s["code"]},
+                timeout=5,
+                poll_interval=1,
+            )
+        assert exc_info.value.stop_reason == {"status": "failed", "code": 500}
+        assert "'status': 'failed'" in str(exc_info.value)
+        assert "timed out" not in str(exc_info.value).lower()
 
     def test_stop_when_none_is_backward_compatible(
         self, s3_resource: S3ServiceResource, test_bucket: str
@@ -257,6 +276,6 @@ class TestToExistStopWhen:
                 timeout=5,
                 poll_interval=1,
             )
-        assert exc_info.value.stop_reason == "stop condition met"
+        assert exc_info.value.stop_reason is None
         assert len(captured) >= 1
         assert captured[0] == {"nested": {"key": "value"}, "list": [1, 2, 3]}
