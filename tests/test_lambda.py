@@ -1,7 +1,5 @@
 """Tests for LambdaFunctionExpectation: to_exist, to_not_exist, to_be_active, to_be_updated."""
 
-from __future__ import annotations
-
 import threading
 
 import pytest

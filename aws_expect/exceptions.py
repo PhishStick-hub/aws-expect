@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 from aws_expect._utils import _format_timeout_error, _truncate_value

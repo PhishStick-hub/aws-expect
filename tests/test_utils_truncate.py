@@ -1,7 +1,5 @@
 """Tests for _truncate_value helper function."""
 
-from __future__ import annotations
-
 from aws_expect._utils import _truncate_value
 
 

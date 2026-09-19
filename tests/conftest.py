@@ -16,19 +16,25 @@ from testcontainers.localstack import LocalStackContainer
 
 
 def _make_lambda_zip(handler_fn: FunctionType) -> bytes:
-    """Create an in-memory zip with handler.py containing *handler_fn* renamed to ``handler``."""
+    """Create an in-memory zip with handler.py containing *handler_fn* renamed to ``handler``.
+
+    Sets the file mode to 0o755 explicitly. The default ``writestr`` mode is 0o600,
+    which the AWS-managed Python 3.13+ runtime (running as a non-root uid) cannot read.
+    """
     source = inspect.getsource(handler_fn)
     source = source.replace(f"def {handler_fn.__name__}(", "def handler(", 1)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("handler.py", source)
+        info = zipfile.ZipInfo("handler.py")
+        info.external_attr = 0o755 << 16
+        zf.writestr(info, source)
     return buf.getvalue()
 
 
 @pytest.fixture(scope="session")
 def localstack() -> Iterator[LocalStackContainer]:
     """Start a LocalStack container for the entire test session."""
-    container = LocalStackContainer(image="localstack/localstack:4")
+    container = LocalStackContainer(image="localstack/localstack:4.11")
     container.with_volume_mapping("/var/run/docker.sock", "/var/run/docker.sock", "rw")
     with container:
         yield container
@@ -188,7 +194,7 @@ def lambda_function(lambda_client: LambdaClient) -> Iterator[str]:
     function_name = f"test-{uuid4().hex[:12]}"
     lambda_client.create_function(
         FunctionName=function_name,
-        Runtime="python3.13",
+        Runtime="python3.14",
         Role=_LAMBDA_ROLE,
         Handler="handler.handler",
         Code={"ZipFile": _make_lambda_zip(_default_handler)},
@@ -205,7 +211,7 @@ def lambda_function_json_body(lambda_client: LambdaClient) -> Iterator[str]:
     function_name = f"test-json-{uuid4().hex[:12]}"
     lambda_client.create_function(
         FunctionName=function_name,
-        Runtime="python3.13",
+        Runtime="python3.14",
         Role=_LAMBDA_ROLE,
         Handler="handler.handler",
         Code={"ZipFile": _make_lambda_zip(_json_body_handler)},
@@ -222,7 +228,7 @@ def lambda_function_nested_body(lambda_client: LambdaClient) -> Iterator[str]:
     function_name = f"test-nested-{uuid4().hex[:12]}"
     lambda_client.create_function(
         FunctionName=function_name,
-        Runtime="python3.13",
+        Runtime="python3.14",
         Role=_LAMBDA_ROLE,
         Handler="handler.handler",
         Code={"ZipFile": _make_lambda_zip(_nested_body_handler)},
@@ -239,7 +245,7 @@ def error_lambda_function(lambda_client: LambdaClient) -> Iterator[str]:
     function_name = f"test-err-{uuid4().hex[:12]}"
     lambda_client.create_function(
         FunctionName=function_name,
-        Runtime="python3.13",
+        Runtime="python3.14",
         Role=_LAMBDA_ROLE,
         Handler="handler.handler",
         Code={"ZipFile": _make_lambda_zip(_error_handler)},
@@ -256,7 +262,7 @@ def lambda_function_empty_payload(lambda_client: LambdaClient) -> Iterator[str]:
     function_name = f"test-empty-{uuid4().hex[:12]}"
     lambda_client.create_function(
         FunctionName=function_name,
-        Runtime="python3.13",
+        Runtime="python3.14",
         Role=_LAMBDA_ROLE,
         Handler="handler.handler",
         Code={"ZipFile": _make_lambda_zip(_empty_payload_handler)},
@@ -273,7 +279,7 @@ def lambda_function_invalid_json(lambda_client: LambdaClient) -> Iterator[str]:
     function_name = f"test-badj-{uuid4().hex[:12]}"
     lambda_client.create_function(
         FunctionName=function_name,
-        Runtime="python3.13",
+        Runtime="python3.14",
         Role=_LAMBDA_ROLE,
         Handler="handler.handler",
         Code={"ZipFile": _make_lambda_zip(_invalid_json_handler)},

@@ -1,7 +1,5 @@
 """Tests for _format_timeout_error helper function."""
 
-from __future__ import annotations
-
 from aws_expect._utils import _format_timeout_error
 
 
