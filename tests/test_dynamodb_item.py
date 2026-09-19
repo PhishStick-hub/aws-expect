@@ -199,7 +199,17 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key == {"pk": "item-3"}
         assert exc_info.value.timeout == 2
-        assert "Actual (last seen):" in str(exc_info.value)
+        assert exc_info.value.expected == {
+            "field": "score",
+            "expected": 100,
+            "delta": 1,
+        }
+        msg = str(exc_info.value)
+        assert msg.startswith("Timed out after 2s waiting for")
+        assert "field 'score' in table" in msg
+        assert "Expected:" in msg
+        assert "Actual:" in msg
+        assert "Actual (last seen):" not in msg
         assert exc_info.value.actual == {"pk": "item-3", "score": 50}
 
     def test_raises_immediately_when_field_not_numeric(
@@ -236,7 +246,9 @@ class TestDynamoDBToHaveNumericValueCloseTo:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key == {"pk": "ghost"}
         assert exc_info.value.timeout == 2
-        assert "Actual (last seen):" in str(exc_info.value)
+        msg = str(exc_info.value)
+        assert "Expected:" in msg
+        assert "Actual:" not in msg
         assert exc_info.value.actual is None
 
     def test_raises_timeout_when_field_absent(self, dynamodb_table: Table) -> None:
@@ -253,7 +265,7 @@ class TestDynamoDBToHaveNumericValueCloseTo:
             )
 
         assert exc_info.value.table_name == dynamodb_table.name
-        assert "Actual (last seen):" in str(exc_info.value)
+        assert "Actual:" in str(exc_info.value)
         assert exc_info.value.actual == {"pk": "item-5", "other": "value"}
 
     def test_catchable_as_base_wait_timeout_error(self, dynamodb_table: Table) -> None:

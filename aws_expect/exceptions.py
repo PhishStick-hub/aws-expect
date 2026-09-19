@@ -241,31 +241,41 @@ class S3ObjectAppearedError(Exception):
 
 
 class DynamoDBWaitTimeoutError(WaitTimeoutError):
-    """Raised when a DynamoDB wait operation exceeds the specified timeout."""
+    """Raised when a DynamoDB wait operation exceeds the specified timeout.
+
+    Attributes:
+        table_name: Name of the DynamoDB table.
+        key: Primary key dict used to look up the item, or ``None`` for
+            table-level operations.
+        timeout: The timeout that was configured for the wait operation.
+        resource_desc: The ``waiting for ...`` description used in the header,
+            or ``None`` when a default was derived from *table_name*/*key*.
+        expected: What the waiter expected to find, or ``None``.
+        actual: What was actually observed (last seen), or ``None``.
+    """
 
     def __init__(
         self,
         table_name: str,
         key: dict[str, str] | None,
         timeout: float,
-        message: str | None = None,
-        expected: dict[str, Any] | None = None,
-        actual: dict[str, Any] | None = None,
+        resource_desc: str | None = None,
+        expected: Any = None,
+        actual: Any = None,
     ) -> None:
         self.table_name = table_name
         self.key = key
         self.timeout = timeout
+        self.resource_desc = resource_desc
         self.expected = expected
         self.actual = actual
-        if message is not None:
-            actual_fmt = repr(actual) if actual is not None else "None"
-            msg = f"{message}\n\nActual (last seen):\n  {actual_fmt}"
-        else:
+        if resource_desc is None:
             resource_desc = (
                 f"item {key} in table {table_name}" if key else f"table {table_name}"
             )
-            msg = _format_timeout_error(resource_desc, expected, actual, timeout)
-        super().__init__(msg)
+        super().__init__(
+            _format_timeout_error(resource_desc, expected, actual, timeout)
+        )
 
 
 class DynamoDBFindItemTimeoutError(DynamoDBWaitTimeoutError):
@@ -298,7 +308,7 @@ class DynamoDBFindItemTimeoutError(DynamoDBWaitTimeoutError):
         WaitTimeoutError.__init__(
             self,
             _format_timeout_error(
-                f"an item matching {expected!r} in table {table_name}",
+                f"a matching item in table {table_name}",
                 expected,
                 actual,
                 timeout,

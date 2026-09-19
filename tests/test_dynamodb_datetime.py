@@ -143,7 +143,17 @@ class TestToHaveDatetimeCloseTo:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key == {"pk": "item-old"}
         assert exc_info.value.timeout == 2
-        assert "Actual (last seen):" in str(exc_info.value)
+        assert exc_info.value.expected == {
+            "field": "created_at",
+            "expected": datetime(2025, 6, 1, tzinfo=timezone.utc),
+            "delta": timedelta(seconds=5),
+        }
+        msg = str(exc_info.value)
+        assert msg.startswith("Timed out after 2s waiting for")
+        assert "field 'created_at' in table" in msg
+        assert "Expected:" in msg
+        assert "Actual:" in msg
+        assert "Actual (last seen):" not in msg
 
     def test_raises_timeout_when_item_missing(self, dynamodb_table: Table) -> None:
         with pytest.raises(DynamoDBWaitTimeoutError) as exc_info:
@@ -155,6 +165,13 @@ class TestToHaveDatetimeCloseTo:
                 poll_interval=1,
             )
 
+        assert exc_info.value.expected == {
+            "field": "created_at",
+            "expected": "now(UTC)",
+            "delta": timedelta(seconds=5),
+        }
+        assert "Expected:" in str(exc_info.value)
+        assert "Actual:" not in str(exc_info.value)
         assert exc_info.value.actual is None
 
     def test_raises_timeout_when_field_absent(self, dynamodb_table: Table) -> None:
@@ -169,6 +186,7 @@ class TestToHaveDatetimeCloseTo:
                 poll_interval=1,
             )
 
+        assert "Actual:" in str(exc_info.value)
         assert exc_info.value.actual == {"pk": "item-nofield", "other": "value"}
 
     def test_raises_immediately_when_field_is_list(self, dynamodb_table: Table) -> None:

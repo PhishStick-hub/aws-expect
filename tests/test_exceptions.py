@@ -187,14 +187,37 @@ class TestDynamoDBWaitTimeoutErrorStr:
         assert "Actual:" in msg
         assert "tbl" in msg
 
-    def test_message_override_preserves_legacy_format(self) -> None:
-        """D-06: message= uses legacy format."""
+    def test_resource_desc_override_uses_unified_format(self) -> None:
+        """D-06 (revised): resource_desc= drives the header; sections stay structured."""
         e = DynamoDBWaitTimeoutError(
-            "tbl", {"pk": "1"}, 10.0, message="Custom header", actual={"b": 2}
+            "tbl",
+            {"pk": "1"},
+            10.0,
+            resource_desc="item {'pk': '1'} field 'score' in table tbl",
+            expected={"field": "score", "expected": 100, "delta": 1},
+            actual={"pk": "1", "score": 50},
         )
         msg = str(e)
-        assert "Custom header" in msg
-        assert "Actual (last seen):" in msg
+        assert msg.startswith(
+            "Timed out after 10.0s waiting for"
+            " item {'pk': '1'} field 'score' in table tbl"
+        )
+        assert "Expected:" in msg
+        assert "Actual:" in msg
+        assert "Actual (last seen):" not in msg
+
+    def test_actual_is_truncated(self) -> None:
+        """Actual goes through _truncate_value — oversized items are truncated."""
+        big = {"pk": "1", "blob": "x" * 2000}
+        e = DynamoDBWaitTimeoutError("tbl", {"pk": "1"}, 10.0, actual=big)
+        assert "value truncated" in str(e)
+
+    def test_message_kwarg_removed(self) -> None:
+        """The legacy message= escape hatch is gone (breaking change)."""
+        with pytest.raises(TypeError):
+            DynamoDBWaitTimeoutError(
+                "tbl", {"pk": "1"}, 10.0, **{"message": "Custom header"}
+            )
 
 
 class TestDynamoDBFindItemTimeoutErrorStr:
@@ -205,6 +228,15 @@ class TestDynamoDBFindItemTimeoutErrorStr:
         msg = str(e)
         assert "Expected:" in msg
         assert "Actual:" in msg
+
+    def test_header_does_not_repeat_expected(self) -> None:
+        """Entries appear once, in the Expected: section — not in the header."""
+        e = DynamoDBFindItemTimeoutError("tbl", {"x": 1}, [{"y": 2}], 10.0)
+        msg = str(e)
+        assert msg.startswith(
+            "Timed out after 10.0s waiting for a matching item in table tbl"
+        )
+        assert msg.count("{'x': 1}") == 1
 
 
 class TestLambdaWaitTimeoutErrorStr:

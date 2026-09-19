@@ -40,6 +40,12 @@ class TestDynamoDBTableToExist:
         assert exc_info.value.table_name == table_name
         assert exc_info.value.key is None
         assert exc_info.value.timeout == 2
+        msg = str(exc_info.value)
+        assert msg.startswith(
+            f"Timed out after 2s waiting for table {table_name} to exist"
+        )
+        assert "Expected:" not in msg
+        assert "Actual:" not in msg
 
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource
@@ -102,6 +108,12 @@ class TestDynamoDBTableToNotExist:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key is None
         assert exc_info.value.timeout == 2
+        msg = str(exc_info.value)
+        assert msg.startswith(
+            f"Timed out after 2s waiting for table {dynamodb_table.name} to not exist"
+        )
+        assert "Expected:" not in msg
+        assert "Actual:" not in msg
 
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
@@ -170,6 +182,10 @@ class TestDynamoDBTableToBeEmpty:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key is None
         assert exc_info.value.timeout == 2
+        msg = str(exc_info.value)
+        assert msg.startswith(
+            f"Timed out after 2s waiting for table {dynamodb_table.name} to be empty"
+        )
 
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
@@ -237,10 +253,15 @@ class TestDynamoDBTableToBeNotEmpty:
         assert exc_info.value.table_name == dynamodb_table.name
         assert exc_info.value.key is None
         assert exc_info.value.timeout == 2
+        msg = str(exc_info.value)
+        assert msg.startswith(
+            f"Timed out after 2s waiting for table {dynamodb_table.name} to be not empty"
+        )
 
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
     ) -> None:
+        """DynamoDBWaitTimeoutError from to_be_not_empty is a WaitTimeoutError."""
         with pytest.raises(WaitTimeoutError):
             expect_dynamodb_table(dynamodb_table).to_be_not_empty(
                 timeout=2, poll_interval=1

@@ -151,10 +151,8 @@ class DynamoDBItemExpectation:
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
-        timeout_message = (
-            f"Timed out after {timeout}s waiting for item {key} field '{field}'"
-            f" to be within {delta} of {expected} in table {self._table_name}"
-        )
+        resource_desc = f"item {key} field '{field}' in table {self._table_name}"
+        expected_section = {"field": field, "expected": expected, "delta": delta}
         last_item: dict[str, Any] | None = None
 
         while True:
@@ -174,7 +172,8 @@ class DynamoDBItemExpectation:
                     self._table_name,
                     key,
                     timeout,
-                    message=timeout_message,
+                    resource_desc=resource_desc,
+                    expected=expected_section,
                     actual=last_item,
                 )
             time.sleep(min(delay, remaining))
@@ -225,11 +224,12 @@ class DynamoDBItemExpectation:
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
         delta_seconds = delta.total_seconds()
-        timeout_message = (
-            f"Timed out after {timeout}s waiting for item {key} field '{field}'"
-            f" to be within {delta} of {expected or 'now(UTC)'}"
-            f" in table {self._table_name}"
-        )
+        resource_desc = f"item {key} field '{field}' in table {self._table_name}"
+        expected_section = {
+            "field": field,
+            "expected": expected if expected is not None else "now(UTC)",
+            "delta": delta,
+        }
         last_item: dict[str, Any] | None = None
         target = self._normalize_to_utc(expected) if expected else None
 
@@ -248,7 +248,8 @@ class DynamoDBItemExpectation:
                     self._table_name,
                     key,
                     timeout,
-                    message=timeout_message,
+                    resource_desc=resource_desc,
+                    expected=expected_section,
                     actual=last_item,
                 )
             time.sleep(min(delay, remaining))
@@ -401,10 +402,7 @@ class DynamoDBTableExpectation:
                     self._table_name,
                     key=None,
                     timeout=timeout,
-                    message=(
-                        f"Timed out after {timeout}s waiting for table "
-                        f"{self._table_name} to exist"
-                    ),
+                    resource_desc=f"table {self._table_name} to exist",
                 )
             time.sleep(min(delay, remaining))
 
@@ -440,10 +438,7 @@ class DynamoDBTableExpectation:
                     self._table_name,
                     key=None,
                     timeout=timeout,
-                    message=(
-                        f"Timed out after {timeout}s waiting for table "
-                        f"{self._table_name} to not exist"
-                    ),
+                    resource_desc=f"table {self._table_name} to not exist",
                 )
             time.sleep(min(delay, remaining))
 
@@ -636,9 +631,6 @@ class DynamoDBTableExpectation:
                     self._table_name,
                     key=None,
                     timeout=timeout,
-                    message=(
-                        f"Timed out after {timeout}s waiting for table "
-                        f"{self._table_name} to be {label}"
-                    ),
+                    resource_desc=f"table {self._table_name} to be {label}",
                 )
             time.sleep(min(delay, remaining))
