@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import math
 import time
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, TypeAlias
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import WaiterConfigTypeDef
 
 _TRUNCATE_ITEM_LIMIT: int = 100
 _TRUNCATE_CHAR_LIMIT: int = 1000
+
+# Shared contract for the public ``stop_when`` predicate: receives a
+# shallow copy of the current state dict; returns ``True`` to stop
+# silently, or a ``str``/``dict`` that becomes the
+# ``StopConditionMetError.stop_reason`` payload.
+_StopWhen: TypeAlias = Callable[[dict[str, Any]], bool | str | dict[str, Any]] | None
 
 
 def _compute_delay(poll_interval: float) -> int:
@@ -150,7 +156,7 @@ def _format_timeout_error(
 
 def _check_stop_condition(
     state: dict[str, Any],
-    stop_when: Callable[[dict[str, Any]], bool | str | dict[str, Any]] | None,
+    stop_when: _StopWhen,
     resource_id: str,
     start: float,
     timeout: float,

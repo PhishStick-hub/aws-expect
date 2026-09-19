@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from aws_expect._utils import (
+    _StopWhen,
     _check_stop_condition,
     _compute_delay,
     _deep_matches,
@@ -65,8 +66,7 @@ class DynamoDBItemExpectation:
         poll_interval: float = 5,
         entries: dict[str, Any] | None = None,
         *,
-        stop_when: Callable[[dict[str, Any]], bool | str | dict[str, Any]]
-        | None = None,
+        stop_when: _StopWhen = None,
     ) -> dict[str, Any]:
         """Poll until item exists and optionally matches *entries* (shallow match).
 
@@ -75,10 +75,10 @@ class DynamoDBItemExpectation:
             timeout: Maximum seconds to wait.
             poll_interval: Seconds between polls (minimum 1).
             entries: Optional shallow subset match.
-            stop_when: Keyword-only. Abort early if callable returns ``True``,
-                a string, or a dict. Strings and dicts become the ``stop_reason``
-                payload; a bare ``True`` gives no reason.
-                Requires *entries*.
+            stop_when: Keyword-only. Predicate over the current item
+                state; a truthy return aborts early via
+                :class:`StopConditionMetError`, whose ``stop_reason``
+                carries a ``str``/``dict`` return. Requires *entries*.
 
         Returns:
             Full item dict.
@@ -508,8 +508,7 @@ class DynamoDBTableExpectation:
         timeout: float = 30,
         poll_interval: float = 5,
         *,
-        stop_when: Callable[[dict[str, Any]], bool | str | dict[str, Any]]
-        | None = None,
+        stop_when: _StopWhen = None,
     ) -> dict[str, Any]:
         """Scan table until an item deep-matches *entries*.
 
@@ -519,9 +518,10 @@ class DynamoDBTableExpectation:
             entries: Subset dict for recursive deep matching.
             timeout: Maximum seconds to wait.
             poll_interval: Seconds between polls (minimum 1).
-            stop_when: Keyword-only. Abort early if callable returns ``True``,
-                a string, or a dict. Strings and dicts become the ``stop_reason``
-                payload; a bare ``True`` gives no reason.
+            stop_when: Keyword-only. Predicate over each scanned item;
+                a truthy return aborts early via
+                :class:`StopConditionMetError`, whose ``stop_reason``
+                carries a ``str``/``dict`` return.
 
         Returns:
             First matching item dict.
