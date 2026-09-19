@@ -7,7 +7,7 @@ Wait for S3 objects, DynamoDB items/tables, SQS messages/events, and Lambda func
 
 - **Declarative syntax**: `expect_s3(obj).to_exist(timeout=30)`
 - **Content matching**: Wait for S3 body JSON or DynamoDB item attributes to match expected values
-- **Smart polling**: `stop_when` predicates abort early when further polling is pointless
+- **Smart polling**: `stop_when` predicates abort early when further polling is pointless; return a `str`/`dict` instead of `True` to attach a stop reason
 - **Richer errors**: Structured `Expected:`/`Actual:` sections in timeout error messages
 - **Native boto3 waiters**: Uses AWS's built-in waiter infrastructure where available
 - **Testing-friendly**: Perfect for integration tests and CI/CD pipelines
@@ -50,10 +50,21 @@ body = expect_s3(obj).to_have_content({"status": "shipped"}, timeout=30)
 # Assert object body does NOT match after a delay
 expect_s3(obj).to_not_have_content({"status": "cancelled"}, delay=5)
 
-# Abort early with stop_when predicate
+# Abort early with stop_when predicate (True stops with no reason)
 body = expect_s3(obj).to_exist(
     entries={"status": "shipped"},
     stop_when=lambda state: state.get("status") == "cancelled",
+    timeout=60,
+)
+
+# A str (or dict) return becomes StopConditionMetError.stop_reason
+body = expect_s3(obj).to_exist(
+    entries={"status": "shipped"},
+    stop_when=lambda state: (
+        f"status is {state['status']}"
+        if state.get("status") == "failed"
+        else False
+    ),
     timeout=60,
 )
 ```
@@ -122,10 +133,19 @@ item = expect_dynamodb_table(table).to_find_item(
 # Assert no matching item exists after a delay
 expect_dynamodb_table(table).to_not_find_item({"status": "cancelled"}, delay=5)
 
-# Abort scan early with stop_when predicate
+# Abort scan early with stop_when predicate (True stops with no reason)
 item = expect_dynamodb_table(table).to_find_item(
     entries={"status": "pending"},
     stop_when=lambda item: item.get("status") == "failed",
+    timeout=60,
+)
+
+# A dict (or str) return becomes StopConditionMetError.stop_reason
+item = expect_dynamodb_table(table).to_find_item(
+    entries={"status": "pending"},
+    stop_when=lambda item: (
+        {"error": item["error"]} if "error" in item else False
+    ),
     timeout=60,
 )
 ```
@@ -327,7 +347,7 @@ All timeout exceptions inherit from `WaitTimeoutError`:
 | `LambdaWaitTimeoutError` | Lambda methods |
 | `LambdaInvocableTimeoutError` | `to_be_invocable` (with `entries`) |
 | `LambdaResponseMismatchError` | `to_respond_with` (not a timeout) |
-| `StopConditionMetError` | `stop_when` predicate returns `True` (not a timeout) |
+| `StopConditionMetError` | `stop_when` predicate returns a truthy value — `True`, or a `str`/`dict` reason (not a timeout) |
 | `StopConditionError` | `stop_when` predicate raises an exception (not a timeout) |
 | `AggregateWaitTimeoutError` | `expect_all`, `expect_any` |
 
