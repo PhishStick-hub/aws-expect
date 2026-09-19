@@ -1,5 +1,28 @@
 # Changelog
 
+## [5.0.0](https://github.com/PhishStick-hub/aws-expect/compare/v4.1.0...v5.0.0) (2026-09-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **exceptions:** clarify StopConditionMetError message and accept dict stop reasons
+* **dynamodb:** DynamoDBWaitTimeoutError's message= kwarg is removed; pass resource_desc= instead. Timeout message text and the expected attribute for numeric/datetime waiters changed shape.
+
+### Features
+
+* **exceptions:** clarify StopConditionMetError message and accept dict stop reasons ([ca5d4df](https://github.com/PhishStick-hub/aws-expect/commit/ca5d4df33ad3307508317499ba0ef3e9297aa36d))
+
+
+### Bug Fixes
+
+* **dynamodb:** expose resource_desc on DynamoDBFindItemTimeoutError ([e659186](https://github.com/PhishStick-hub/aws-expect/commit/e659186d3c6e49d30dbea2698d75cb57d670107e))
+* **dynamodb:** unify timeout messages through _format_timeout_error ([2db2233](https://github.com/PhishStick-hub/aws-expect/commit/2db2233e470ff54735ff40f5787d1e04f6109adf))
+
+
+### Documentation
+
+* **readme:** document str/dict stop_when stop reasons ([05a899f](https://github.com/PhishStick-hub/aws-expect/commit/05a899fc0e635025f83c8df9776c85de3c4bb956))
+
 ## [4.1.0](https://github.com/PhishStick-hub/aws-expect/compare/v4.0.2...v4.1.0) (2026-07-18)
 
 

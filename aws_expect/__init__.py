@@ -1,4 +1,4 @@
-__version__ = "4.1.0"
+__version__ = "5.0.0"
 
 from aws_expect.dynamodb import DynamoDBItemExpectation, DynamoDBTableExpectation
 from aws_expect.exceptions import (
