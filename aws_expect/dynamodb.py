@@ -47,6 +47,17 @@ class DynamoDBItemExpectation:
         params = "&".join(f"{k}={v}" for k, v in sorted(key.items()))
         return f"{base}?{params}"
 
+    def _field_resource_desc(self, key: dict[str, Any], field: str) -> str:
+        """Build the ``waiting for ...`` header description for an item field."""
+        return f"item {key} field '{field}' in table {self._table_name}"
+
+    @staticmethod
+    def _field_expected_section(
+        field: str, expected: Any, delta: Any
+    ) -> dict[str, Any]:
+        """Build the ``Expected:`` section dict for field-convergence waiters."""
+        return {"field": field, "expected": expected, "delta": delta}
+
     def to_exist(
         self,
         key: dict[str, Any],
@@ -151,8 +162,8 @@ class DynamoDBItemExpectation:
         """
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
-        resource_desc = f"item {key} field '{field}' in table {self._table_name}"
-        expected_section = {"field": field, "expected": expected, "delta": delta}
+        resource_desc = self._field_resource_desc(key, field)
+        expected_section = self._field_expected_section(field, expected, delta)
         last_item: dict[str, Any] | None = None
 
         while True:
@@ -224,12 +235,10 @@ class DynamoDBItemExpectation:
         delay = _compute_delay(poll_interval)
         deadline = time.monotonic() + timeout
         delta_seconds = delta.total_seconds()
-        resource_desc = f"item {key} field '{field}' in table {self._table_name}"
-        expected_section = {
-            "field": field,
-            "expected": expected if expected is not None else "now(UTC)",
-            "delta": delta,
-        }
+        resource_desc = self._field_resource_desc(key, field)
+        expected_section = self._field_expected_section(
+            field, expected if expected is not None else "now(UTC)", delta
+        )
         last_item: dict[str, Any] | None = None
         target = self._normalize_to_utc(expected) if expected else None
 

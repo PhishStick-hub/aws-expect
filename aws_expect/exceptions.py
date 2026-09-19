@@ -260,8 +260,8 @@ class DynamoDBWaitTimeoutError(WaitTimeoutError):
         key: dict[str, str] | None,
         timeout: float,
         resource_desc: str | None = None,
-        expected: Any = None,
-        actual: Any = None,
+        expected: dict[str, Any] | None = None,
+        actual: dict[str, Any] | None = None,
     ) -> None:
         self.table_name = table_name
         self.key = key
@@ -300,15 +300,17 @@ class DynamoDBFindItemTimeoutError(DynamoDBWaitTimeoutError):
         actual: list[dict[str, Any]] | None,
         timeout: float,
     ) -> None:
+        resource_desc = f"a matching item in table {table_name}"
         self.table_name = table_name
         self.expected = expected
         self.actual = actual
         self.timeout = timeout
         self.key = None
+        self.resource_desc = resource_desc
         WaitTimeoutError.__init__(
             self,
             _format_timeout_error(
-                f"a matching item in table {table_name}",
+                resource_desc,
                 expected,
                 actual,
                 timeout,

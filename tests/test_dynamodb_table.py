@@ -261,7 +261,6 @@ class TestDynamoDBTableToBeNotEmpty:
     def test_catchable_as_base_wait_timeout_error(
         self, dynamodb_resource: DynamoDBServiceResource, dynamodb_table: Table
     ) -> None:
-        """DynamoDBWaitTimeoutError from to_be_not_empty is a WaitTimeoutError."""
         with pytest.raises(WaitTimeoutError):
             expect_dynamodb_table(dynamodb_table).to_be_not_empty(
                 timeout=2, poll_interval=1

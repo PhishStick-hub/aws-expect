@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from aws_expect.exceptions import (
@@ -214,10 +216,9 @@ class TestDynamoDBWaitTimeoutErrorStr:
 
     def test_message_kwarg_removed(self) -> None:
         """The legacy message= escape hatch is gone (breaking change)."""
+        kwargs: dict[str, Any] = {"message": "Custom header"}
         with pytest.raises(TypeError):
-            DynamoDBWaitTimeoutError(
-                "tbl", {"pk": "1"}, 10.0, **{"message": "Custom header"}
-            )
+            DynamoDBWaitTimeoutError("tbl", {"pk": "1"}, 10.0, **kwargs)
 
 
 class TestDynamoDBFindItemTimeoutErrorStr:
@@ -237,6 +238,11 @@ class TestDynamoDBFindItemTimeoutErrorStr:
             "Timed out after 10.0s waiting for a matching item in table tbl"
         )
         assert msg.count("{'x': 1}") == 1
+
+    def test_resource_desc_attribute_exposed(self) -> None:
+        """Matches the attribute contract documented on the parent class."""
+        e = DynamoDBFindItemTimeoutError("tbl", {"x": 1}, [{"y": 2}], 10.0)
+        assert e.resource_desc == "a matching item in table tbl"
 
 
 class TestLambdaWaitTimeoutErrorStr:
