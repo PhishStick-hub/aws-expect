@@ -1,7 +1,5 @@
 """Tests for _check_stop_condition reason semantics."""
 
-from __future__ import annotations
-
 import re
 import time
 from typing import Any

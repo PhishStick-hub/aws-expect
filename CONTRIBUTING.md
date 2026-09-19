@@ -104,7 +104,7 @@ feature/xxx → PR (conventional commits) → main
 
 ### Prerequisites
 
-- **Python 3.13+** (required)
+- **Python 3.14+** (required)
 - **uv** package manager (required)
 - **Docker** (required for running tests)
 

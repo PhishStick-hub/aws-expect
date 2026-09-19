@@ -1,7 +1,5 @@
 """Expectation wrapper for AWS Lambda functions."""
 
-from __future__ import annotations
-
 import json
 import time
 from typing import TYPE_CHECKING, Any
@@ -217,7 +215,7 @@ class LambdaFunctionExpectation:
                 if raw:
                     try:
                         response_payload: Any = json.loads(raw)
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         response_payload = None
                     else:
                         last_actual = response_payload
@@ -312,7 +310,7 @@ class LambdaFunctionExpectation:
 
         try:
             response_payload: dict[str, Any] = json.loads(raw)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             raise LambdaResponseMismatchError(
                 function_name,
                 None,
@@ -359,7 +357,7 @@ class LambdaFunctionExpectation:
         if expected_payload is not None:
             try:
                 parsed_body: dict[str, Any] = json.loads(payload.get("body", ""))
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return False
             if not isinstance(parsed_body, dict):
                 return False

@@ -1,7 +1,5 @@
 """Tests for LambdaFunctionExpectation.to_be_invocable."""
 
-from __future__ import annotations
-
 from http import HTTPStatus
 
 import pytest

@@ -95,16 +95,30 @@ All custom waiters follow the same structure:
 
 Tests use `testcontainers[localstack]` for a session-scoped LocalStack container. Fixtures in `tests/conftest.py` provide session-scoped clients and function-scoped buckets/tables/queues/functions with unique names. Tests use `threading.Timer` to simulate async resource creation. Use short timeouts (2–10 s) in tests.
 
-**Lambda testing**: LocalStack 4 requires the Docker socket to be mounted (`/var/run/docker.sock`) for Lambda execution. The `localstack` fixture does this automatically. The `lambda_function` fixture creates a Python 3.13 function from an in-memory zip and waits for `function_active_v2` before yielding; teardown ignores `ResourceNotFoundException` in case the test already deleted the function. The `lambda_function_json_body` fixture creates a function whose `body` response field is a JSON-encoded dict (`{"message": "hello", "status": "ok"}`), used for `to_respond_with` tests.
+**Lambda testing**: LocalStack 4 requires the Docker socket to be mounted (`/var/run/docker.sock`) for Lambda execution. The `localstack` fixture does this automatically. The `lambda_function` fixture creates a Python 3.14 function from an in-memory zip and waits for `function_active_v2` before yielding; teardown ignores `ResourceNotFoundException` in case the test already deleted the function. The `lambda_function_json_body` fixture creates a function whose `body` response field is a JSON-encoded dict (`{"message": "hello", "status": "ok"}`), used for `to_respond_with` tests.
 
 **Lambda handler stubs**: `_make_lambda_zip` deploys handlers via `inspect.getsource` — the function body is extracted verbatim and runs in an isolated Lambda environment with no access to conftest.py's module-level imports. Any stdlib module a handler needs (e.g. `json`) **must** be imported inside the function body with `# noqa: PLC0415`. Moving such imports to the module level breaks the deployed handler at runtime.
 
 ## Conventions
 
-- **Python 3.13+**, full type annotations required on all code
+- **Python 3.14+**, full type annotations required on all code
 - **Commit format**: Conventional Commits with scope — `feat(s3): ...`, `fix(dynamodb): ...`, `chore(ci): ...`; breaking changes use `!` (e.g., `feat(s3)!: ...`). Never add AI tool attribution (e.g., "Generated with Claude Code") to commit messages or PR bodies.
 - **Imports**: stdlib → third-party → local, absolute only
 - **Exceptions**: all timeout exceptions inherit `WaitTimeoutError`; use `raise NewError(...) from exc` for chaining
 - **Docstrings**: Google-style for public API methods
 - **Branching**: `feature/`, `fix/`, or `chore/` prefixes
 - **HTTP constants**: use `http.HTTPStatus` for status codes and `http.HTTPMethod` for method names in tests; skip for invalid sentinel values (e.g. `999`) and for Lambda handler source extracted via `inspect.getsource`
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues, operated via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical role labels, strings equal to their names: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` at the repo root, ADRs in `docs/adr/`. See `docs/agents/domain.md`.

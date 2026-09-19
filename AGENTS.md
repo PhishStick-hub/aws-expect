@@ -37,7 +37,7 @@ CI runs: `ruff format --check` → `ruff check` → `ty check` → `pytest` (20 
 
 ## Conventions
 
-- Python 3.13+, full type annotations required; `dict[str, Any] | None` over `Optional[...]`; boto3 types use `Any`
+- Python 3.14+, full type annotations required; `dict[str, Any] | None` over `Optional[...]`; boto3 types use `Any`
 - Use boto3 **resource API** where available; fall back to client only when no resource interface exists (e.g. Lambda, EventBridge)
 - Conventional Commits with scope: `feat(s3): ...`, `fix(dynamodb): ...`; breaking: `feat(s3)!: ...`
 - Never add AI tool attribution (Co-authored-by, "Generated with...") to commits or PRs

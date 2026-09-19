@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import time
 from collections.abc import Iterator
@@ -32,7 +30,7 @@ def _parse_actual_events(
 def _try_parse_json(body: str) -> Any:
     try:
         return json.loads(body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return None
 
 
@@ -245,7 +243,7 @@ class SQSQueueExpectation:
         """
         try:
             body = json.loads(message["Body"])
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             return False
         return isinstance(body, dict) and _deep_matches(body, event)
 

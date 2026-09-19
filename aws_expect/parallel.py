@@ -1,14 +1,12 @@
-from __future__ import annotations
-
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from typing import Any, TypeAlias, TypeVar, cast, overload
+from typing import Any, TypeVar, cast, overload
 
 from aws_expect.exceptions import AggregateWaitTimeoutError, WaitTimeoutError
 
 T = TypeVar("T")
 
-ExpectationItem: TypeAlias = Callable[[], T] | tuple[Callable[..., T], *tuple[Any, ...]]
+type ExpectationItem[T] = Callable[[], T] | tuple[Callable[..., T], *tuple[Any, ...]]
 
 
 def _submit_expectation(

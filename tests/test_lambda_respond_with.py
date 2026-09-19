@@ -1,7 +1,5 @@
 """Tests for LambdaFunctionExpectation.to_respond_with."""
 
-from __future__ import annotations
-
 import io
 from unittest.mock import patch
 

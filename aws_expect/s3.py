@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import time
 from typing import TYPE_CHECKING, Any, overload
@@ -149,7 +147,7 @@ class S3ObjectExpectation:
             if err.response["Error"]["Code"] not in _S3_NOT_FOUND_CODES:
                 raise
             return None
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        except json.JSONDecodeError, UnicodeDecodeError:
             return None
 
     def _poll_for_entries(
