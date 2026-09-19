@@ -39,14 +39,25 @@ class TestStopConditionMetError:
         assert e.elapsed == 1.5
         assert e.timeout == 10.0
 
-    def test_str_format_is_pytest_assertion_style(self) -> None:
+    def test_str_shows_condition_reason_not_timeout_framing(self) -> None:
         e = StopConditionMetError("my-resource", "some value", 2.0, 5.0)
         msg = str(e)
-        assert "assert" in msg
-        assert "my-resource" in msg
-        assert "some value" in msg
-        assert "2.0" in msg
-        assert "5.0" in msg
+        assert msg == "Stop condition met for 'my-resource' after 2.0s: 'some value'"
+
+    def test_str_omits_reason_suffix_when_none(self) -> None:
+        e = StopConditionMetError("my-resource", None, 2.0, 5.0)
+        msg = str(e)
+        assert msg == "Stop condition met for 'my-resource' after 2.0s"
+
+    def test_str_renders_dict_reason(self) -> None:
+        e = StopConditionMetError(
+            "my-resource", {"status": "failed", "code": 500}, 2.0, 5.0
+        )
+        msg = str(e)
+        assert msg == (
+            "Stop condition met for 'my-resource' "
+            "after 2.0s: {'status': 'failed', 'code': 500}"
+        )
 
     def test_can_be_raised_and_caught(self) -> None:
         with pytest.raises(StopConditionMetError) as exc_info:

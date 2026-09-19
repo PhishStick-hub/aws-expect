@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from aws_expect._utils import _format_timeout_error
+from aws_expect._utils import _format_timeout_error, _truncate_value
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import HeadObjectOutputTypeDef
@@ -37,12 +37,17 @@ class StopConditionMetError(Exception):
 
     Signals that polling should stop immediately because the stop condition
     was satisfied.  Does **not** inherit :class:`WaitTimeoutError` — this is
-    a deliberate stop, not a timeout.
+    a deliberate stop, not a timeout.  The message names the fired condition
+    without "timeout" framing: a bare ``True`` result gives a plain header,
+    while a ``str`` or ``dict`` reason returned by the predicate is rendered
+    as the suffix.
 
     Attributes:
         resource_id: Identifier for the resource being polled
             (e.g. ``s3://bucket/key``).
-        stop_reason: The string reason returned by the predicate.
+        stop_reason: The reason returned by the predicate: the rendered
+            ``str`` / ``dict`` payload, or ``None`` when the predicate
+            returned a bare ``True``.
         elapsed: Seconds elapsed since polling started.
         timeout: The configured timeout (seconds) that was not exceeded.
     """
@@ -50,7 +55,7 @@ class StopConditionMetError(Exception):
     def __init__(
         self,
         resource_id: str,
-        stop_reason: str,
+        stop_reason: str | dict[str, Any] | None,
         elapsed: float,
         timeout: float,
     ) -> None:
@@ -58,10 +63,10 @@ class StopConditionMetError(Exception):
         self.stop_reason = stop_reason
         self.elapsed = elapsed
         self.timeout = timeout
-        super().__init__(
-            f"assert stop condition not met for {resource_id!r} after {elapsed:.1f}s "
-            f"of {timeout:.1f}s timeout: {stop_reason!r}"
-        )
+        message = f"Stop condition met for {resource_id!r} after {elapsed:.1f}s"
+        if stop_reason is not None:
+            message += f": {_truncate_value(stop_reason)}"
+        super().__init__(message)
 
 
 class StopConditionError(Exception):

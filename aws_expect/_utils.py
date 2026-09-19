@@ -150,19 +150,24 @@ def _format_timeout_error(
 
 def _check_stop_condition(
     state: dict[str, Any],
-    stop_when: Callable[[dict[str, Any]], bool | str] | None,
+    stop_when: Callable[[dict[str, Any]], bool | str | dict[str, Any]] | None,
     resource_id: str,
     start: float,
     timeout: float,
 ) -> dict[str, Any] | None:
     """Evaluate *stop_when* predicate against a shallow-copied *state* dict.
 
+    Reason semantics:
+        * predicate returns a ``str`` — the string becomes the reason.
+        * predicate returns a ``dict`` — the dict becomes the reason payload.
+        * predicate returns any other truthy value — reason is ``None``.
+
     Returns:
         ``None`` when *stop_when* is ``None`` (no-op).
-        ``None`` when predicate returns ``False`` (continue polling).
+        ``None`` when predicate returns a falsy value (continue polling).
 
     Raises:
-        StopConditionMetError: When predicate returns ``True`` or a string.
+        StopConditionMetError: When predicate returns a truthy value.
         StopConditionError: When predicate raises a non-StopConditionMetError.
     """
     # Lazy import to break circular dependency with exceptions.py
@@ -182,10 +187,10 @@ def _check_stop_condition(
     if not result:
         return None
 
-    if isinstance(result, str):
+    if isinstance(result, (str, dict)):
         stop_reason = result
     else:
-        stop_reason = "stop condition met"
+        stop_reason = None
 
     elapsed = time.monotonic() - start
     raise StopConditionMetError(resource_id, stop_reason, elapsed, timeout)

@@ -59,7 +59,7 @@ class S3ObjectExpectation:
         poll_interval: float = ...,
         entries: dict[str, Any] = ...,
         *,
-        stop_when: Callable[[dict[str, Any]], bool | str] | None = ...,
+        stop_when: Callable[[dict[str, Any]], bool | str | dict[str, Any]] | None = ...,
     ) -> dict[str, Any]: ...
 
     def to_exist(
@@ -68,7 +68,8 @@ class S3ObjectExpectation:
         poll_interval: float = 5,
         entries: dict[str, Any] | None = None,
         *,
-        stop_when: Callable[[dict[str, Any]], bool | str] | None = None,
+        stop_when: Callable[[dict[str, Any]], bool | str | dict[str, Any]]
+        | None = None,
     ) -> HeadObjectOutputTypeDef | dict[str, Any]:
         """Wait for the S3 object to exist and optionally match *entries*.
 
@@ -82,8 +83,10 @@ class S3ObjectExpectation:
             timeout: Maximum seconds to wait.
             poll_interval: Seconds between polls (minimum 1).
             entries: Optional expected key-value pairs for shallow subset match.
-            stop_when: Callable receiving the current body state; return ``True``
-                or a string to abort early. Requires *entries*. Keyword-only.
+            stop_when: Callable receiving the current body state; return ``True``,
+                a string, or a dict to abort early. Strings and dicts become the
+                ``stop_reason`` payload on StopConditionMetError; a bare ``True``
+                gives no reason. Requires *entries*. Keyword-only.
 
         Returns:
             ``head_object`` metadata dict (no *entries*) or parsed JSON body.
@@ -154,7 +157,8 @@ class S3ObjectExpectation:
         timeout: float,
         poll_interval: float,
         entries: dict[str, Any],
-        stop_when: Callable[[dict[str, Any]], bool | str] | None = None,
+        stop_when: Callable[[dict[str, Any]], bool | str | dict[str, Any]]
+        | None = None,
     ) -> dict[str, Any]:
         """Poll ``get_object``, parse JSON, and wait for a subset match.
 
@@ -163,8 +167,8 @@ class S3ObjectExpectation:
             poll_interval: Seconds between polls (minimum 1).
             entries: Expected key-value pairs for a shallow subset match.
             stop_when: Optional callable evaluated after entries mismatch.
-                Receives a shallow-copied state dict. Returns ``True`` or a
-                string reason to abort polling early via StopConditionMetError.
+                Receives a shallow-copied state dict. Returns ``True``, a string,
+                or a dict reason to abort polling early via StopConditionMetError.
 
         Raises:
             S3EntriesWaitTimeoutError: Object missing or its body did not

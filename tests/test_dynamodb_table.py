@@ -311,7 +311,7 @@ class TestToFindItemStopWhen:
                 timeout=5,
                 poll_interval=1,
             )
-        assert exc_info.value.stop_reason == "stop condition met"
+        assert exc_info.value.stop_reason is None
         assert exc_info.value.resource_id == f"dynamodb://{dynamodb_table.name}"
 
     def test_stop_when_does_not_fire_on_matching_item(
@@ -340,6 +340,17 @@ class TestToFindItemStopWhen:
                 poll_interval=1,
             )
         assert exc_info.value.stop_reason == "found error: timeout"
+
+    def test_stop_when_dict_return_used_as_reason(self, dynamodb_table: Table) -> None:
+        dynamodb_table.put_item(Item={"pk": "z", "error_code": 500, "status": "bad"})
+        with pytest.raises(StopConditionMetError) as exc_info:
+            expect_dynamodb_table(dynamodb_table).to_find_item(
+                entries={"status": "ok"},
+                stop_when=lambda s: {"error": s["status"], "code": s["error_code"]},
+                timeout=5,
+                poll_interval=1,
+            )
+        assert exc_info.value.stop_reason == {"error": "bad", "code": 500}
 
     def test_predicate_raises_valueerror_wraps_in_stop_condition_error(
         self, dynamodb_table: Table

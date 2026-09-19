@@ -12,7 +12,7 @@ from aws_expect import (
 class TestToExistStopWhen:
     """Tests for expect_dynamodb_item(table).to_exist(key=..., entries=..., stop_when=...)."""
 
-    def test_stop_when_returns_true_aborts_with_default_reason(
+    def test_stop_when_returns_true_aborts_without_reason(
         self, dynamodb_table: Table
     ) -> None:
         dynamodb_table.put_item(Item={"pk": "item-1", "status": "pending"})
@@ -27,9 +27,25 @@ class TestToExistStopWhen:
         assert exc_info.value.resource_id.startswith(
             f"dynamodb://{dynamodb_table.name}?pk=item-1"
         )
-        assert exc_info.value.stop_reason == "stop condition met"
+        assert exc_info.value.stop_reason is None
         assert exc_info.value.elapsed >= 0
         assert exc_info.value.timeout == 5
+
+    def test_stop_when_returns_dict_uses_it_as_reason(
+        self, dynamodb_table: Table
+    ) -> None:
+        dynamodb_table.put_item(Item={"pk": "item-1b", "status": "failed", "code": 500})
+        with pytest.raises(StopConditionMetError) as exc_info:
+            expect_dynamodb_item(dynamodb_table).to_exist(
+                key={"pk": "item-1b"},
+                entries={"status": "active"},
+                stop_when=lambda s: {"status": s["status"], "code": s["code"]},
+                timeout=5,
+                poll_interval=1,
+            )
+        assert exc_info.value.stop_reason == {"status": "failed", "code": 500}
+        assert "'status': 'failed'" in str(exc_info.value)
+        assert "timed out" not in str(exc_info.value).lower()
 
     def test_stop_when_returns_string_uses_it_as_reason(
         self, dynamodb_table: Table
