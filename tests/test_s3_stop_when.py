@@ -47,6 +47,25 @@ class TestToExistStopWhen:
             )
         assert exc_info.value.stop_reason == "status is failed"
 
+    def test_stop_when_returns_dict_uses_it_as_reason(
+        self, s3_resource: S3ServiceResource, test_bucket: str
+    ) -> None:
+        key = "test-key-dict"
+        s3_resource.Object(test_bucket, key).put(
+            Body=json.dumps({"status": "failed", "code": 500}).encode()
+        )
+        obj = s3_resource.Object(test_bucket, key)
+        with pytest.raises(StopConditionMetError) as exc_info:
+            expect_s3(obj).to_exist(
+                entries={"status": "active"},
+                stop_when=lambda s: {"status": s["status"], "code": s["code"]},
+                timeout=5,
+                poll_interval=1,
+            )
+        assert exc_info.value.stop_reason == {"status": "failed", "code": 500}
+        assert "'status': 'failed'" in str(exc_info.value)
+        assert "timed out" not in str(exc_info.value).lower()
+
     def test_stop_when_none_is_backward_compatible(
         self, s3_resource: S3ServiceResource, test_bucket: str
     ) -> None:
